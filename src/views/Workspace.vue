@@ -42,6 +42,36 @@
       </n-grid-item>
     </n-grid>
 
+    <n-card class="panel account-panel">
+      <template #header>
+        <div class="card-header">
+          <span>当前用户</span>
+          <n-text :depth="3">{{ currentUser.id || "未登录" }}</n-text>
+        </div>
+      </template>
+      <n-grid cols="1 760:4" :x-gap="12" :y-gap="12">
+        <n-grid-item>
+          <n-input v-model:value="loginForm.email" placeholder="邮箱，例如 creator@example.com" />
+        </n-grid-item>
+        <n-grid-item>
+          <n-input v-model:value="loginForm.name" placeholder="昵称，例如 篮球观察员" />
+        </n-grid-item>
+        <n-grid-item>
+          <n-button type="primary" block :loading="loginLoading" @click="login">
+            登录 / 创建本地用户
+          </n-button>
+        </n-grid-item>
+        <n-grid-item>
+          <n-button block secondary @click="useDefaultUser">
+            使用默认用户
+          </n-button>
+        </n-grid-item>
+      </n-grid>
+      <n-alert class="account-tip" type="info" :show-icon="false">
+        本阶段是本地轻量登录：用邮箱生成稳定用户 ID，所有订阅、草稿、发布记录会按用户隔离。
+      </n-alert>
+    </n-card>
+
     <n-grid cols="1 980:3" :x-gap="20" :y-gap="20">
       <n-grid-item>
         <n-card title="订阅设置" class="panel">
@@ -359,12 +389,14 @@ import {
   createWorkspacePublishRecord,
   generateWorkspaceDraft,
   getWorkspaceAuditLogs,
+  getWorkspaceMe,
   getWorkspaceOverview,
   getWorkspacePersona,
   getWorkspacePublishRecords,
   getWorkspaceDrafts,
   getWorkspaceFeed,
   getWorkspacePreferences,
+  loginWorkspace,
   saveWorkspacePersona,
   saveWorkspacePreferences,
   updateWorkspaceDraftReview,
@@ -387,6 +419,15 @@ const preferences = ref({
   excludeWords: [],
   sources: [],
   tone: "balanced",
+});
+const currentUser = ref({
+  id: "",
+  email: "",
+  name: "",
+});
+const loginForm = ref({
+  email: "",
+  name: "",
 });
 const persona = ref({
   displayName: "",
@@ -418,6 +459,7 @@ const overview = ref({
 const metricForms = ref({});
 const checkResults = ref({});
 const selectedTopic = ref(null);
+const loginLoading = ref(false);
 const saving = ref(false);
 const personaSaving = ref(false);
 const feedLoading = ref(false);
@@ -430,6 +472,49 @@ const loadPreferences = async () => {
     preferences.value = res.data;
     draftOptions.value.tone = res.data.tone;
   }
+};
+
+const loadMe = async () => {
+  const res = await getWorkspaceMe();
+  if (res.code === 200) {
+    currentUser.value = res.data;
+    loginForm.value.email = res.data.email || loginForm.value.email;
+    loginForm.value.name = res.data.name || loginForm.value.name;
+  }
+};
+
+const reloadWorkspace = async () => {
+  await Promise.all([loadMe(), loadPreferences(), loadPersona()]);
+  await Promise.all([
+    loadFeed(false),
+    loadDrafts(),
+    loadPublishRecords(),
+    loadOverview(),
+    loadAuditLogs(),
+  ]);
+};
+
+const login = async () => {
+  if (!loginForm.value.email) return $message.warning("请输入邮箱");
+  loginLoading.value = true;
+  try {
+    const res = await loginWorkspace(loginForm.value);
+    if (res.code === 200) {
+      localStorage.setItem("workspaceUserId", res.data.id);
+      currentUser.value = res.data;
+      $message.success(`已登录：${res.data.name}`);
+      await reloadWorkspace();
+    }
+  } finally {
+    loginLoading.value = false;
+  }
+};
+
+const useDefaultUser = async () => {
+  localStorage.removeItem("workspaceUserId");
+  loginForm.value = { email: "", name: "" };
+  $message.info("已切换到默认本地用户");
+  await reloadWorkspace();
 };
 
 const loadPersona = async () => {
@@ -658,14 +743,7 @@ const reviewType = (status = "draft") => {
 const formatDate = (date) => new Date(date).toLocaleString();
 
 onMounted(async () => {
-  await Promise.all([loadPreferences(), loadPersona()]);
-  await Promise.all([
-    loadFeed(false),
-    loadDrafts(),
-    loadPublishRecords(),
-    loadOverview(),
-    loadAuditLogs(),
-  ]);
+  await reloadWorkspace();
 });
 </script>
 
@@ -712,9 +790,18 @@ onMounted(async () => {
   }
 
   .persona-panel,
+  .account-panel,
   .records-panel,
   .audit-panel {
     margin-top: 20px;
+  }
+
+  .account-panel {
+    margin-bottom: 20px;
+
+    .account-tip {
+      margin-top: 12px;
+    }
   }
 
   .card-header {

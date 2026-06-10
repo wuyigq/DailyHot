@@ -25,6 +25,21 @@ export const getWorkspacePreferences = () => {
   });
 };
 
+export const loginWorkspace = (data) => {
+  return axios({
+    method: "POST",
+    url: "/workspace/auth/login",
+    data,
+  });
+};
+
+export const getWorkspaceMe = () => {
+  return axios({
+    method: "GET",
+    url: "/workspace/auth/me",
+  });
+};
+
 export const saveWorkspacePreferences = (data) => {
   return axios({
     method: "PUT",

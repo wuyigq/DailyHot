@@ -23,6 +23,10 @@ axios.interceptors.request.use(
     if (token) {
       request.headers.Authorization = token;
     }
+    const workspaceUserId = localStorage.getItem("workspaceUserId");
+    if (workspaceUserId) {
+      request.headers["X-User-Id"] = workspaceUserId;
+    }
     return request;
   },
   (error) => {
