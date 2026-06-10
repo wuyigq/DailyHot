@@ -346,6 +346,14 @@
                 type="textarea"
                 :autosize="{ minRows: 5, maxRows: 12 }"
               />
+              <n-select
+                class="draft-account-select"
+                size="small"
+                :value="selectedAccountIdForDraft(draft)"
+                :options="accountOptionsForDraft(draft)"
+                :placeholder="`${platformLabel(draft.platform)}发布账号`"
+                @update:value="setSelectedAccount(draft, $event)"
+              />
               <n-space justify="end" class="draft-actions">
                 <n-button size="small" secondary @click="saveDraftContent(draft)">
                   保存版本
@@ -568,20 +576,48 @@
           <n-input v-model:value="accountForm.profileUrl" placeholder="主页链接，可选" />
         </n-grid-item>
         <n-grid-item>
-          <n-button type="primary" block secondary @click="createPlatformAccount">
-            添加账号
-          </n-button>
+          <n-space vertical>
+            <n-button type="primary" block secondary @click="savePlatformAccount">
+              {{ editingAccountId ? "保存账号" : "添加账号" }}
+            </n-button>
+            <n-button v-if="editingAccountId" block secondary @click="resetAccountForm">
+              取消编辑
+            </n-button>
+          </n-space>
         </n-grid-item>
       </n-grid>
       <div v-if="platformAccounts.length" class="account-list">
-        <n-tag
+        <div
           v-for="account in platformAccounts"
           :key="account.id"
-          round
-          :type="account.platform === accountForm.platform ? 'success' : 'default'"
+          class="account-item"
+          :class="{ inactive: account.status === 'inactive' }"
         >
-          {{ platformLabel(account.platform) }} · {{ account.displayName }}
-        </n-tag>
+          <div>
+            <n-space align="center" size="small">
+              <n-tag size="small" round :type="account.platform === accountForm.platform ? 'success' : 'default'">
+                {{ platformLabel(account.platform) }}
+              </n-tag>
+              <strong>{{ account.displayName }}</strong>
+              <n-tag size="small" round :type="account.status === 'inactive' ? 'warning' : 'success'">
+                {{ account.status === "inactive" ? "已停用" : "启用中" }}
+              </n-tag>
+            </n-space>
+            <p v-if="account.profileUrl">{{ account.profileUrl }}</p>
+            <p v-if="account.note">{{ account.note }}</p>
+          </div>
+          <n-space size="small">
+            <n-button size="tiny" secondary @click="editPlatformAccount(account)">
+              编辑
+            </n-button>
+            <n-button size="tiny" secondary @click="togglePlatformAccountStatus(account)">
+              {{ account.status === "inactive" ? "恢复" : "停用" }}
+            </n-button>
+            <n-button size="tiny" type="error" secondary @click="deletePlatformAccount(account)">
+              删除
+            </n-button>
+          </n-space>
+        </div>
       </div>
       <n-alert v-else class="account-tip" type="info" :show-icon="false">
         本地只保存账号昵称、平台和主页链接，不保存密码、Cookie 或平台 token。
@@ -696,6 +732,7 @@ import {
   createWorkspacePlatformAccount,
   createWorkspacePublishRecord,
   createWorkspacePublishSchedule,
+  deleteWorkspacePlatformAccount,
   generateWorkspaceDraft,
   getWorkspaceAuditLogs,
   getWorkspaceMe,
@@ -716,6 +753,7 @@ import {
   saveWorkspaceDraftContent,
   saveWorkspacePreferences,
   updateWorkspaceDraftReview,
+  updateWorkspacePlatformAccount,
   updateWorkspacePublishMetrics,
   updateWorkspacePublishSchedule,
 } from "@/api";
@@ -797,6 +835,7 @@ const accountForm = ref({
   profileUrl: "",
   note: "",
 });
+const editingAccountId = ref("");
 const feed = ref([]);
 const drafts = ref([]);
 const publishRecords = ref([]);
@@ -834,6 +873,7 @@ const metricForms = ref({});
 const checkResults = ref({});
 const publishPackages = ref({});
 const draftVersions = ref({});
+const selectedAccountIds = ref({});
 const selectedTopic = ref(null);
 const loginLoading = ref(false);
 const saving = ref(false);
@@ -981,17 +1021,73 @@ const loadPlatformAccounts = async () => {
   if (res.code === 200) platformAccounts.value = res.data;
 };
 
-const createPlatformAccount = async () => {
+const resetAccountForm = () => {
+  editingAccountId.value = "";
+  accountForm.value = {
+    platform: "weibo",
+    displayName: "",
+    profileUrl: "",
+    note: "",
+  };
+};
+
+const savePlatformAccount = async () => {
   if (!accountForm.value.platform || !accountForm.value.displayName) {
     return $message.warning("请选择平台并填写账号昵称");
   }
-  const res = await createWorkspacePlatformAccount(accountForm.value);
+  const res = editingAccountId.value
+    ? await updateWorkspacePlatformAccount(editingAccountId.value, accountForm.value)
+    : await createWorkspacePlatformAccount(accountForm.value);
   if (res.code === 200) {
-    platformAccounts.value = [...platformAccounts.value, res.data];
-    accountForm.value.displayName = "";
-    accountForm.value.profileUrl = "";
-    accountForm.value.note = "";
-    $message.success("平台账号已添加");
+    if (editingAccountId.value) {
+      platformAccounts.value = platformAccounts.value.map((account) =>
+        account.id === res.data.id ? res.data : account
+      );
+      $message.success("平台账号已更新");
+    } else {
+      platformAccounts.value = [...platformAccounts.value, res.data];
+      $message.success("平台账号已添加");
+    }
+    resetAccountForm();
+    await loadAuditLogs();
+  }
+};
+
+const editPlatformAccount = (account) => {
+  editingAccountId.value = account.id;
+  accountForm.value = {
+    platform: account.platform,
+    displayName: account.displayName,
+    profileUrl: account.profileUrl || "",
+    note: account.note || "",
+  };
+};
+
+const togglePlatformAccountStatus = async (account) => {
+  const status = account.status === "inactive" ? "active" : "inactive";
+  const res = await updateWorkspacePlatformAccount(account.id, { status });
+  if (res.code === 200) {
+    platformAccounts.value = platformAccounts.value.map((item) => (item.id === account.id ? res.data : item));
+    if (status === "inactive") {
+      selectedAccountIds.value = Object.fromEntries(
+        Object.entries(selectedAccountIds.value).filter(([, accountId]) => accountId !== account.id)
+      );
+    }
+    $message.success(status === "inactive" ? "账号已停用" : "账号已恢复");
+    await loadAuditLogs();
+  }
+};
+
+const deletePlatformAccount = async (account) => {
+  if (!window.confirm(`确认删除账号「${account.displayName}」？历史发布记录会保留账号名称。`)) return;
+  const res = await deleteWorkspacePlatformAccount(account.id);
+  if (res.code === 200) {
+    platformAccounts.value = platformAccounts.value.filter((item) => item.id !== account.id);
+    selectedAccountIds.value = Object.fromEntries(
+      Object.entries(selectedAccountIds.value).filter(([, accountId]) => accountId !== account.id)
+    );
+    if (editingAccountId.value === account.id) resetAccountForm();
+    $message.success("平台账号已删除");
     await loadAuditLogs();
   }
 };
@@ -1164,7 +1260,7 @@ const openPublishTarget = (publishPackage) => {
 };
 
 const recordPublish = async (draft) => {
-  const account = defaultAccountForPlatform(draft.platform);
+  const account = selectedAccountForDraft(draft);
   const res = await createWorkspacePublishRecord({
     draftId: draft.id,
     platform: draft.platform,
@@ -1195,7 +1291,7 @@ const appendPublishRecord = (record) => {
 };
 
 const schedulePublish = async (draft) => {
-  const account = defaultAccountForPlatform(draft.platform);
+  const account = selectedAccountForDraft(draft);
   const scheduledAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
   const res = await createWorkspacePublishSchedule({
     draftId: draft.id,
@@ -1276,7 +1372,40 @@ const platformLabel = (platform) => {
 };
 
 const defaultAccountForPlatform = (platform) => {
-  return platformAccounts.value.find((account) => account.platform === platform);
+  return platformAccounts.value.find((account) => account.platform === platform && account.status !== "inactive");
+};
+
+const accountOptionsForDraft = (draft) => {
+  const accounts = platformAccounts.value.filter(
+    (account) => account.platform === draft.platform && account.status !== "inactive"
+  );
+  return [
+    { label: "不指定账号", value: "" },
+    ...accounts.map((account) => ({
+      label: account.displayName,
+      value: account.id,
+    })),
+  ];
+};
+
+const selectedAccountIdForDraft = (draft) => {
+  const selectedId = selectedAccountIds.value[draft.id];
+  const activeAccount = platformAccounts.value.find(
+    (account) => account.id === selectedId && account.platform === draft.platform && account.status !== "inactive"
+  );
+  return activeAccount?.id || defaultAccountForPlatform(draft.platform)?.id || "";
+};
+
+const selectedAccountForDraft = (draft) => {
+  const accountId = selectedAccountIdForDraft(draft);
+  return platformAccounts.value.find((account) => account.id === accountId);
+};
+
+const setSelectedAccount = (draft, accountId) => {
+  selectedAccountIds.value = {
+    ...selectedAccountIds.value,
+    [draft.id]: accountId || "",
+  };
 };
 
 const reviewLabel = (status = "draft") => {
@@ -1400,10 +1529,30 @@ onMounted(async () => {
 
   .accounts-panel {
     .account-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
+      display: grid;
+      gap: 10px;
       margin-top: 14px;
+
+      .account-item {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        border-radius: 12px;
+        background: rgba(248, 250, 252, 0.7);
+
+        p {
+          margin: 6px 0 0;
+          color: var(--n-text-color-2);
+          word-break: break-all;
+        }
+
+        &.inactive {
+          opacity: 0.62;
+        }
+      }
     }
   }
 
@@ -1527,6 +1676,10 @@ onMounted(async () => {
 
     .draft-actions {
       margin-top: 12px;
+    }
+
+    .draft-account-select {
+      margin-top: 10px;
     }
 
     .check-result {

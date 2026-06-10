@@ -160,6 +160,13 @@ export const updateWorkspacePlatformAccount = (id, data) => {
   });
 };
 
+export const deleteWorkspacePlatformAccount = (id) => {
+  return axios({
+    method: "DELETE",
+    url: `/workspace/platform-accounts/${id}`,
+  });
+};
+
 export const getWorkspacePublishSchedules = () => {
   return axios({
     method: "GET",
