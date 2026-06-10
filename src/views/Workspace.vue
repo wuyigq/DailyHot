@@ -437,6 +437,37 @@
                       {{ item }}
                     </li>
                   </ul>
+                  <div
+                    v-if="publishPackages[draft.id].mediaSuggestion"
+                    class="media-suggestion"
+                  >
+                    <div class="media-title">
+                      <strong>封面/配图建议</strong>
+                      <n-tag size="small" round>
+                        {{ publishPackages[draft.id].mediaSuggestion.size }}
+                      </n-tag>
+                    </div>
+                    <p>
+                      封面标题：{{ publishPackages[draft.id].mediaSuggestion.coverTitle }}
+                    </p>
+                    <n-input
+                      :value="publishPackages[draft.id].mediaSuggestion.imagePrompt"
+                      type="textarea"
+                      readonly
+                      :autosize="{ minRows: 3, maxRows: 6 }"
+                    />
+                    <ul class="package-checklist">
+                      <li
+                        v-for="tip in publishPackages[draft.id].mediaSuggestion.styleTips"
+                        :key="tip"
+                      >
+                        {{ tip }}
+                      </li>
+                    </ul>
+                    <n-alert type="warning" :show-icon="false">
+                      {{ publishPackages[draft.id].mediaSuggestion.copyrightNotice }}
+                    </n-alert>
+                  </div>
                   <n-space justify="end" class="draft-actions">
                     <n-button size="small" secondary @click="copyDraft(publishPackages[draft.id].copyText)">
                       复制发布包
@@ -1530,6 +1561,27 @@ onMounted(async () => {
         padding-left: 18px;
         color: var(--n-text-color-2);
         line-height: 1.7;
+      }
+
+      .media-suggestion {
+        display: grid;
+        gap: 10px;
+        padding: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        border-radius: 12px;
+        background: rgba(248, 250, 252, 0.72);
+
+        p {
+          margin: 0;
+          color: var(--n-text-color-2);
+        }
+
+        .media-title {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
       }
     }
 
