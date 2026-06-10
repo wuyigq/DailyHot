@@ -130,6 +130,29 @@ export const getWorkspacePublishRecords = () => {
   });
 };
 
+export const getWorkspacePlatformAccounts = () => {
+  return axios({
+    method: "GET",
+    url: "/workspace/platform-accounts",
+  });
+};
+
+export const createWorkspacePlatformAccount = (data) => {
+  return axios({
+    method: "POST",
+    url: "/workspace/platform-accounts",
+    data,
+  });
+};
+
+export const updateWorkspacePlatformAccount = (id, data) => {
+  return axios({
+    method: "PATCH",
+    url: `/workspace/platform-accounts/${id}`,
+    data,
+  });
+};
+
 export const getWorkspacePublishSchedules = () => {
   return axios({
     method: "GET",

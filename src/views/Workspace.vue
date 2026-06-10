@@ -437,6 +437,48 @@
       </n-grid-item>
     </n-grid>
 
+    <n-card class="panel accounts-panel">
+      <template #header>
+        <div class="card-header">
+          <span>平台账号</span>
+          <n-button size="small" secondary @click="loadPlatformAccounts">刷新</n-button>
+        </div>
+      </template>
+      <n-grid cols="1 760:4" :x-gap="12" :y-gap="12">
+        <n-grid-item>
+          <n-select
+            v-model:value="accountForm.platform"
+            :options="platformOptions"
+            placeholder="平台"
+          />
+        </n-grid-item>
+        <n-grid-item>
+          <n-input v-model:value="accountForm.displayName" placeholder="账号昵称，例如 体育观察号" />
+        </n-grid-item>
+        <n-grid-item>
+          <n-input v-model:value="accountForm.profileUrl" placeholder="主页链接，可选" />
+        </n-grid-item>
+        <n-grid-item>
+          <n-button type="primary" block secondary @click="createPlatformAccount">
+            添加账号
+          </n-button>
+        </n-grid-item>
+      </n-grid>
+      <div v-if="platformAccounts.length" class="account-list">
+        <n-tag
+          v-for="account in platformAccounts"
+          :key="account.id"
+          round
+          :type="account.platform === accountForm.platform ? 'success' : 'default'"
+        >
+          {{ platformLabel(account.platform) }} · {{ account.displayName }}
+        </n-tag>
+      </div>
+      <n-alert v-else class="account-tip" type="info" :show-icon="false">
+        本地只保存账号昵称、平台和主页链接，不保存密码、Cookie 或平台 token。
+      </n-alert>
+    </n-card>
+
     <n-card class="panel schedules-panel">
       <template #header>
         <div class="card-header">
@@ -449,7 +491,7 @@
           v-for="schedule in publishSchedules"
           :key="schedule.id"
           :type="scheduleType(schedule.status)"
-          :title="`${platformLabel(schedule.platform)} · ${scheduleLabel(schedule.status)}`"
+          :title="`${platformLabel(schedule.platform)} · ${schedule.accountName || '未指定账号'} · ${scheduleLabel(schedule.status)}`"
           :time="formatDate(schedule.scheduledAt)"
         >
           <div class="schedule-content">
@@ -483,7 +525,7 @@
           v-for="record in publishRecords"
           :key="record.id"
           :type="record.status === 'failed' ? 'error' : 'success'"
-          :title="`${platformLabel(record.platform)} · ${record.status}`"
+          :title="`${platformLabel(record.platform)} · ${record.accountName || '未指定账号'} · ${record.status}`"
           :time="formatDate(record.createdAt)"
         >
           <div class="record-content">
@@ -541,6 +583,7 @@
 <script setup>
 import {
   checkWorkspaceDraft,
+  createWorkspacePlatformAccount,
   createWorkspacePublishRecord,
   createWorkspacePublishSchedule,
   generateWorkspaceDraft,
@@ -548,6 +591,7 @@ import {
   getWorkspaceMe,
   getWorkspaceOverview,
   getWorkspacePersona,
+  getWorkspacePlatformAccounts,
   getWorkspacePublishPackage,
   getWorkspacePublishRecords,
   getWorkspacePublishSchedules,
@@ -573,6 +617,11 @@ const sourceOptions = [
   { label: "抖音", name: "douyin" },
   { label: "今日头条", name: "toutiao" },
   { label: "IT之家", name: "ithome" },
+];
+const platformOptions = [
+  { label: "微博短评", value: "weibo" },
+  { label: "小红书笔记", value: "xiaohongshu" },
+  { label: "视频口播", value: "video" },
 ];
 
 const preferences = ref({
@@ -603,10 +652,17 @@ const draftOptions = ref({
   platform: "weibo",
   tone: "balanced",
 });
+const accountForm = ref({
+  platform: "weibo",
+  displayName: "",
+  profileUrl: "",
+  note: "",
+});
 const feed = ref([]);
 const drafts = ref([]);
 const publishRecords = ref([]);
 const publishSchedules = ref([]);
+const platformAccounts = ref([]);
 const auditLogs = ref([]);
 const overview = ref({
   draftCount: 0,
@@ -661,6 +717,7 @@ const reloadWorkspace = async () => {
   await Promise.all([
     loadFeed(false),
     loadDrafts(),
+    loadPlatformAccounts(),
     loadPublishRecords(),
     loadPublishSchedules(),
     loadOverview(),
@@ -759,6 +816,26 @@ const loadPublishRecords = async () => {
       };
       return acc;
     }, {});
+  }
+};
+
+const loadPlatformAccounts = async () => {
+  const res = await getWorkspacePlatformAccounts();
+  if (res.code === 200) platformAccounts.value = res.data;
+};
+
+const createPlatformAccount = async () => {
+  if (!accountForm.value.platform || !accountForm.value.displayName) {
+    return $message.warning("请选择平台并填写账号昵称");
+  }
+  const res = await createWorkspacePlatformAccount(accountForm.value);
+  if (res.code === 200) {
+    platformAccounts.value = [...platformAccounts.value, res.data];
+    accountForm.value.displayName = "";
+    accountForm.value.profileUrl = "";
+    accountForm.value.note = "";
+    $message.success("平台账号已添加");
+    await loadAuditLogs();
   }
 };
 
@@ -916,9 +993,11 @@ const openPublishTarget = (publishPackage) => {
 };
 
 const recordPublish = async (draft) => {
+  const account = defaultAccountForPlatform(draft.platform);
   const res = await createWorkspacePublishRecord({
     draftId: draft.id,
     platform: draft.platform,
+    accountId: account?.id,
     status: "assisted",
     note: "已复制或分享到目标平台，等待用户手动确认发布。",
   });
@@ -945,10 +1024,12 @@ const appendPublishRecord = (record) => {
 };
 
 const schedulePublish = async (draft) => {
+  const account = defaultAccountForPlatform(draft.platform);
   const scheduledAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
   const res = await createWorkspacePublishSchedule({
     draftId: draft.id,
     platform: draft.platform,
+    accountId: account?.id,
     scheduledAt,
     note: "已加入发布计划，建议到点前再次检查内容和来源。",
   });
@@ -1015,6 +1096,10 @@ const platformLabel = (platform) => {
     xiaohongshu: "小红书笔记",
     video: "视频口播",
   }[platform] || platform;
+};
+
+const defaultAccountForPlatform = (platform) => {
+  return platformAccounts.value.find((account) => account.platform === platform);
 };
 
 const reviewLabel = (status = "draft") => {
@@ -1120,6 +1205,7 @@ onMounted(async () => {
 
   .persona-panel,
   .account-panel,
+  .accounts-panel,
   .schedules-panel,
   .records-panel,
   .audit-panel {
@@ -1131,6 +1217,15 @@ onMounted(async () => {
 
     .account-tip {
       margin-top: 12px;
+    }
+  }
+
+  .accounts-panel {
+    .account-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
     }
   }
 
