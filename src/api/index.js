@@ -71,6 +71,28 @@ export const getWorkspaceDrafts = () => {
   });
 };
 
+export const saveWorkspaceDraftContent = (id, data) => {
+  return axios({
+    method: "PATCH",
+    url: `/workspace/drafts/${id}/content`,
+    data,
+  });
+};
+
+export const getWorkspaceDraftVersions = (id) => {
+  return axios({
+    method: "GET",
+    url: `/workspace/drafts/${id}/versions`,
+  });
+};
+
+export const restoreWorkspaceDraftVersion = (id, versionId) => {
+  return axios({
+    method: "POST",
+    url: `/workspace/drafts/${id}/versions/${versionId}/restore`,
+  });
+};
+
 export const getWorkspacePersona = () => {
   return axios({
     method: "GET",

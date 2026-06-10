@@ -301,6 +301,12 @@
                 :autosize="{ minRows: 5, maxRows: 12 }"
               />
               <n-space justify="end" class="draft-actions">
+                <n-button size="small" secondary @click="saveDraftContent(draft)">
+                  保存版本
+                </n-button>
+                <n-button size="small" secondary @click="loadDraftVersions(draft)">
+                  历史版本
+                </n-button>
                 <n-button size="small" secondary @click="checkDraft(draft)">
                   发布检查
                 </n-button>
@@ -386,6 +392,35 @@
                     </n-button>
                   </n-space>
                 </n-space>
+              </n-card>
+              <n-card
+                v-if="draftVersions[draft.id]?.length"
+                class="draft-versions"
+                size="small"
+                embedded
+              >
+                <template #header>
+                  <div class="card-header">
+                    <span>版本历史</span>
+                    <n-tag size="small" round>{{ draftVersions[draft.id].length }} 个版本</n-tag>
+                  </div>
+                </template>
+                <n-timeline>
+                  <n-timeline-item
+                    v-for="version in draftVersions[draft.id]"
+                    :key="version.id"
+                    type="info"
+                    :title="version.note"
+                    :time="formatDate(version.createdAt)"
+                  >
+                    <p class="version-preview">{{ version.content }}</p>
+                    <n-space justify="end">
+                      <n-button size="tiny" secondary @click="restoreDraftVersion(draft, version)">
+                        恢复此版本
+                      </n-button>
+                    </n-space>
+                  </n-timeline-item>
+                </n-timeline>
               </n-card>
             </article>
           </div>
@@ -473,10 +508,13 @@ import {
   getWorkspacePublishPackage,
   getWorkspacePublishRecords,
   getWorkspaceDrafts,
+  getWorkspaceDraftVersions,
   getWorkspaceFeed,
   getWorkspacePreferences,
   loginWorkspace,
+  restoreWorkspaceDraftVersion,
   saveWorkspacePersona,
+  saveWorkspaceDraftContent,
   saveWorkspacePreferences,
   updateWorkspaceDraftReview,
   updateWorkspacePublishMetrics,
@@ -544,6 +582,7 @@ const overview = ref({
 const metricForms = ref({});
 const checkResults = ref({});
 const publishPackages = ref({});
+const draftVersions = ref({});
 const selectedTopic = ref(null);
 const loginLoading = ref(false);
 const saving = ref(false);
@@ -735,6 +774,46 @@ const checkDraft = async (draft) => {
     $message[res.data.passed ? "success" : "warning"](
       res.data.passed ? "发布检查通过" : "发布前仍有风险项"
     );
+    await loadAuditLogs();
+  }
+};
+
+const saveDraftContent = async (draft) => {
+  const res = await saveWorkspaceDraftContent(draft.id, {
+    content: draft.content,
+    note: "手动保存草稿",
+  });
+  if (res.code === 200) {
+    Object.assign(draft, res.data.draft);
+    draftVersions.value = {
+      ...draftVersions.value,
+      [draft.id]: [res.data.version, ...(draftVersions.value[draft.id] || [])],
+    };
+    $message.success("草稿版本已保存");
+    await loadAuditLogs();
+  }
+};
+
+const loadDraftVersions = async (draft) => {
+  const res = await getWorkspaceDraftVersions(draft.id);
+  if (res.code === 200) {
+    draftVersions.value = {
+      ...draftVersions.value,
+      [draft.id]: res.data,
+    };
+    $message.success("版本历史已加载");
+  }
+};
+
+const restoreDraftVersion = async (draft, version) => {
+  const res = await restoreWorkspaceDraftVersion(draft.id, version.id);
+  if (res.code === 200) {
+    Object.assign(draft, res.data.draft);
+    draftVersions.value = {
+      ...draftVersions.value,
+      [draft.id]: [res.data.version, ...(draftVersions.value[draft.id] || [])],
+    };
+    $message.success("已恢复历史版本");
     await loadAuditLogs();
   }
 };
@@ -1071,6 +1150,20 @@ onMounted(async () => {
         padding-left: 18px;
         color: var(--n-text-color-2);
         line-height: 1.7;
+      }
+    }
+
+    .draft-versions {
+      margin-top: 12px;
+
+      .version-preview {
+        display: -webkit-box;
+        margin: 0 0 8px;
+        overflow: hidden;
+        color: var(--n-text-color-2);
+        line-height: 1.7;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 3;
       }
     }
   }
