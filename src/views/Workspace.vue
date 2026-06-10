@@ -631,15 +631,23 @@
           <n-button size="small" secondary @click="loadPublishSchedules">刷新</n-button>
         </div>
       </template>
-      <n-timeline v-if="publishSchedules.length">
+      <n-grid cols="1 480:3" :x-gap="8" :y-gap="8" class="schedule-filters">
+        <n-grid-item>
+          <n-select v-model:value="scheduleFilters.status" :options="scheduleStatusFilterOptions" />
+        </n-grid-item>
+      </n-grid>
+      <n-timeline v-if="filteredPublishSchedules.length">
         <n-timeline-item
-          v-for="schedule in publishSchedules"
+          v-for="schedule in filteredPublishSchedules"
           :key="schedule.id"
           :type="scheduleType(schedule.status)"
           :title="`${platformLabel(schedule.platform)} · ${schedule.accountName || '未指定账号'} · ${scheduleLabel(schedule.status)}`"
           :time="formatDate(schedule.scheduledAt)"
         >
           <div class="schedule-content">
+            <n-tag v-if="isScheduleOverdue(schedule)" size="small" type="warning" round>
+              已到点/逾期
+            </n-tag>
             <p>{{ schedule.note || "等待执行发布计划" }}</p>
             <n-space class="record-actions" justify="end">
               <n-button size="small" secondary @click="updateScheduleStatus(schedule, 'ready')">
@@ -795,6 +803,16 @@ const draftRiskFilterOptions = [
   { label: "需核实", value: "medium" },
   { label: "高风险", value: "high" },
 ];
+const scheduleStatusFilterOptions = [
+  { label: "待处理计划", value: "open" },
+  { label: "已到点/逾期", value: "overdue" },
+  { label: "全部计划", value: "all" },
+  { label: "未到点", value: "pending" },
+  { label: "待发布", value: "ready" },
+  { label: "已发布", value: "published" },
+  { label: "已跳过", value: "skipped" },
+  { label: "失败", value: "failed" },
+];
 
 const preferences = ref({
   keywords: [],
@@ -828,6 +846,9 @@ const draftFilters = ref({
   platform: "all",
   reviewStatus: "all",
   riskLevel: "all",
+});
+const scheduleFilters = ref({
+  status: "open",
 });
 const accountForm = ref({
   platform: "weibo",
@@ -888,6 +909,14 @@ const filteredDrafts = computed(() => {
       draftFilters.value.reviewStatus === "all" || (draft.reviewStatus || "draft") === draftFilters.value.reviewStatus;
     const riskMatched = draftFilters.value.riskLevel === "all" || draft.topic?.riskLevel === draftFilters.value.riskLevel;
     return platformMatched && reviewMatched && riskMatched;
+  });
+});
+const filteredPublishSchedules = computed(() => {
+  return publishSchedules.value.filter((schedule) => {
+    if (scheduleFilters.value.status === "all") return true;
+    if (scheduleFilters.value.status === "open") return ["pending", "ready"].includes(schedule.status);
+    if (scheduleFilters.value.status === "overdue") return isScheduleOverdue(schedule);
+    return schedule.status === scheduleFilters.value.status;
   });
 });
 
@@ -1460,6 +1489,10 @@ const scheduleType = (status = "pending") => {
   }[status] || "info";
 };
 
+const isScheduleOverdue = (schedule) => {
+  return ["pending", "ready"].includes(schedule.status) && new Date(schedule.scheduledAt).getTime() <= Date.now();
+};
+
 const formatDate = (date) => new Date(date).toLocaleString();
 
 onMounted(async () => {
@@ -1750,6 +1783,12 @@ onMounted(async () => {
         -webkit-box-orient: vertical;
         -webkit-line-clamp: 3;
       }
+    }
+  }
+
+  .schedules-panel {
+    .schedule-filters {
+      margin-bottom: 12px;
     }
   }
 
