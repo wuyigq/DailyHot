@@ -274,8 +274,19 @@
               <n-button size="small" secondary @click="loadDrafts">刷新</n-button>
             </div>
           </template>
-          <div v-if="drafts.length" class="draft-list">
-            <article v-for="draft in drafts" :key="draft.id" class="draft">
+          <n-grid cols="1 720:3" :x-gap="8" :y-gap="8" class="draft-filters">
+            <n-grid-item>
+              <n-select v-model:value="draftFilters.platform" :options="draftPlatformFilterOptions" />
+            </n-grid-item>
+            <n-grid-item>
+              <n-select v-model:value="draftFilters.reviewStatus" :options="draftReviewFilterOptions" />
+            </n-grid-item>
+            <n-grid-item>
+              <n-select v-model:value="draftFilters.riskLevel" :options="draftRiskFilterOptions" />
+            </n-grid-item>
+          </n-grid>
+          <div v-if="filteredDrafts.length" class="draft-list">
+            <article v-for="draft in filteredDrafts" :key="draft.id" class="draft">
               <div class="draft-meta">
                 <n-tag size="small" round>{{ platformLabel(draft.platform) }}</n-tag>
                 <n-tag size="small" round :type="generationType(draft.generationMode)">
@@ -329,6 +340,9 @@
                 </n-button>
                 <n-button size="small" type="success" secondary :disabled="isPublishBlocked(draft)" @click="recordPublish(draft)">
                   记录发布
+                </n-button>
+                <n-button size="small" type="error" secondary @click="archiveDraft(draft)">
+                  归档
                 </n-button>
               </n-space>
               <n-alert
@@ -440,7 +454,7 @@
               </n-card>
             </article>
           </div>
-          <n-empty v-else description="还没有草稿" />
+          <n-empty v-else description="没有符合筛选条件的草稿" />
         </n-card>
       </n-grid-item>
     </n-grid>
@@ -616,6 +630,7 @@
 
 <script setup>
 import {
+  archiveWorkspaceDraft,
   checkWorkspaceDraft,
   createWorkspacePlatformAccount,
   createWorkspacePublishRecord,
@@ -658,6 +673,23 @@ const platformOptions = [
   { label: "小红书笔记", value: "xiaohongshu" },
   { label: "视频口播", value: "video" },
 ];
+const draftPlatformFilterOptions = [
+  { label: "全部平台", value: "all" },
+  ...platformOptions,
+];
+const draftReviewFilterOptions = [
+  { label: "全部审核状态", value: "all" },
+  { label: "草稿", value: "draft" },
+  { label: "审核中", value: "reviewing" },
+  { label: "已通过", value: "approved" },
+  { label: "已驳回", value: "rejected" },
+];
+const draftRiskFilterOptions = [
+  { label: "全部风险", value: "all" },
+  { label: "低风险", value: "low" },
+  { label: "需核实", value: "medium" },
+  { label: "高风险", value: "high" },
+];
 
 const preferences = ref({
   keywords: [],
@@ -686,6 +718,11 @@ const persona = ref({
 const draftOptions = ref({
   platform: "weibo",
   tone: "balanced",
+});
+const draftFilters = ref({
+  platform: "all",
+  reviewStatus: "all",
+  riskLevel: "all",
 });
 const accountForm = ref({
   platform: "weibo",
@@ -737,6 +774,15 @@ const personaSaving = ref(false);
 const feedLoading = ref(false);
 const generating = ref(false);
 const feedError = ref("");
+const filteredDrafts = computed(() => {
+  return drafts.value.filter((draft) => {
+    const platformMatched = draftFilters.value.platform === "all" || draft.platform === draftFilters.value.platform;
+    const reviewMatched =
+      draftFilters.value.reviewStatus === "all" || (draft.reviewStatus || "draft") === draftFilters.value.reviewStatus;
+    const riskMatched = draftFilters.value.riskLevel === "all" || draft.topic?.riskLevel === draftFilters.value.riskLevel;
+    return platformMatched && reviewMatched && riskMatched;
+  });
+});
 
 const loadPreferences = async () => {
   const res = await getWorkspacePreferences();
@@ -995,6 +1041,15 @@ const restoreDraftVersion = async (draft, version) => {
     };
     $message.success("已恢复历史版本");
     await loadAuditLogs();
+  }
+};
+
+const archiveDraft = async (draft) => {
+  const res = await archiveWorkspaceDraft(draft.id);
+  if (res.code === 200) {
+    drafts.value = drafts.value.filter((item) => item.id !== draft.id);
+    $message.success("草稿已归档");
+    await Promise.all([loadOverview(), loadInsights(), loadAuditLogs()]);
   }
 };
 
@@ -1304,6 +1359,10 @@ onMounted(async () => {
     display: flex;
     flex-direction: column;
     gap: 12px;
+  }
+
+  .draft-filters {
+    margin-bottom: 12px;
   }
 
   .topic {

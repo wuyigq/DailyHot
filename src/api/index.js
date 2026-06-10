@@ -71,6 +71,13 @@ export const getWorkspaceDrafts = () => {
   });
 };
 
+export const archiveWorkspaceDraft = (id) => {
+  return axios({
+    method: "DELETE",
+    url: `/workspace/drafts/${id}`,
+  });
+};
+
 export const saveWorkspaceDraftContent = (id, data) => {
   return axios({
     method: "PATCH",
