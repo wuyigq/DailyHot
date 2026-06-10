@@ -94,6 +94,13 @@ export const checkWorkspaceDraft = (id, data) => {
   });
 };
 
+export const getWorkspacePublishPackage = (id) => {
+  return axios({
+    method: "GET",
+    url: `/workspace/drafts/${id}/publish-package`,
+  });
+};
+
 export const getWorkspacePublishRecords = () => {
   return axios({
     method: "GET",

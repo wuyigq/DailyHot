@@ -281,6 +281,9 @@
                 <n-button size="small" secondary @click="checkDraft(draft)">
                   发布检查
                 </n-button>
+                <n-button size="small" secondary @click="loadPublishPackage(draft)">
+                  发布助手
+                </n-button>
                 <n-button size="small" secondary @click="copyDraft(draft.content)">
                   复制
                 </n-button>
@@ -309,6 +312,58 @@
                   </li>
                 </ul>
               </n-alert>
+              <n-card
+                v-if="publishPackages[draft.id]"
+                class="publish-package"
+                size="small"
+                embedded
+              >
+                <template #header>
+                  <div class="card-header">
+                    <span>{{ publishPackages[draft.id].platformName }}发布包</span>
+                    <n-tag size="small" round>
+                      {{ publishPackages[draft.id].copyText.length }} 字
+                    </n-tag>
+                  </div>
+                </template>
+                <n-space vertical>
+                  <n-input
+                    :value="publishPackages[draft.id].copyText"
+                    type="textarea"
+                    readonly
+                    :autosize="{ minRows: 4, maxRows: 8 }"
+                  />
+                  <div class="tag-row">
+                    <n-tag
+                      v-for="tag in publishPackages[draft.id].hashtags"
+                      :key="tag"
+                      size="small"
+                      round
+                    >
+                      #{{ tag }}
+                    </n-tag>
+                  </div>
+                  <ul class="package-checklist">
+                    <li v-for="item in publishPackages[draft.id].checklist" :key="item">
+                      {{ item }}
+                    </li>
+                  </ul>
+                  <n-space justify="end" class="draft-actions">
+                    <n-button size="small" secondary @click="copyDraft(publishPackages[draft.id].copyText)">
+                      复制发布包
+                    </n-button>
+                    <n-button size="small" secondary @click="downloadPackage(publishPackages[draft.id])">
+                      下载文案
+                    </n-button>
+                    <n-button size="small" type="primary" secondary @click="sharePackage(publishPackages[draft.id])">
+                      手机分享
+                    </n-button>
+                    <n-button size="small" type="success" secondary @click="openPublishTarget(publishPackages[draft.id])">
+                      打开平台
+                    </n-button>
+                  </n-space>
+                </n-space>
+              </n-card>
             </article>
           </div>
           <n-empty v-else description="还没有草稿" />
@@ -392,6 +447,7 @@ import {
   getWorkspaceMe,
   getWorkspaceOverview,
   getWorkspacePersona,
+  getWorkspacePublishPackage,
   getWorkspacePublishRecords,
   getWorkspaceDrafts,
   getWorkspaceFeed,
@@ -458,6 +514,7 @@ const overview = ref({
 });
 const metricForms = ref({});
 const checkResults = ref({});
+const publishPackages = ref({});
 const selectedTopic = ref(null);
 const loginLoading = ref(false);
 const saving = ref(false);
@@ -651,6 +708,49 @@ const checkDraft = async (draft) => {
     );
     await loadAuditLogs();
   }
+};
+
+const loadPublishPackage = async (draft) => {
+  const res = await getWorkspacePublishPackage(draft.id);
+  if (res.code === 200) {
+    publishPackages.value = {
+      ...publishPackages.value,
+      [draft.id]: res.data,
+    };
+    $message.success("发布包已生成");
+    await loadAuditLogs();
+  }
+};
+
+const sharePackage = async (publishPackage) => {
+  if (navigator.share) {
+    await navigator.share({
+      title: publishPackage.title,
+      text: publishPackage.mobileShareText || publishPackage.copyText,
+    });
+  } else {
+    await copyDraft(publishPackage.copyText);
+    $message.info("当前浏览器不支持系统分享，已复制发布包");
+  }
+};
+
+const downloadPackage = (publishPackage) => {
+  const file = publishPackage.files?.[0];
+  if (!file) return $message.warning("没有可下载文件");
+  const blob = new Blob([file.content], { type: file.mimeType || "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = file.filename || `${publishPackage.draftId}.txt`;
+  link.click();
+  URL.revokeObjectURL(url);
+};
+
+const openPublishTarget = (publishPackage) => {
+  const target = publishPackage.deeplinks?.[0];
+  if (!target?.url) return $message.warning("该平台暂未配置跳转入口");
+  const url = window.innerWidth <= 680 && target.mobileUrl ? target.mobileUrl : target.url;
+  window.open(url, "_blank");
 };
 
 const recordPublish = async (draft) => {
@@ -913,6 +1013,23 @@ onMounted(async () => {
         padding-left: 18px;
       }
     }
+
+    .publish-package {
+      margin-top: 12px;
+
+      .tag-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .package-checklist {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--n-text-color-2);
+        line-height: 1.7;
+      }
+    }
   }
 
   .record-content {
@@ -934,6 +1051,14 @@ onMounted(async () => {
 
     .topic {
       flex-direction: column;
+    }
+
+    .draft {
+      .draft-meta,
+      .draft-actions {
+        flex-wrap: wrap;
+        justify-content: flex-start;
+      }
     }
   }
 }
