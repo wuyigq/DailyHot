@@ -923,20 +923,25 @@ const recordPublish = async (draft) => {
     note: "已复制或分享到目标平台，等待用户手动确认发布。",
   });
   if (res.code === 200) {
-    publishRecords.value = [res.data, ...publishRecords.value];
-    metricForms.value = {
-      ...metricForms.value,
-      [res.data.id]: {
-        views: 0,
-        likes: 0,
-        comments: 0,
-        shares: 0,
-        leads: 0,
-      },
-    };
+    appendPublishRecord(res.data);
     $message.success("发布动作已记录");
     await Promise.all([loadOverview(), loadAuditLogs()]);
   }
+};
+
+const appendPublishRecord = (record) => {
+  if (!record || publishRecords.value.some((item) => item.id === record.id)) return;
+  publishRecords.value = [record, ...publishRecords.value];
+  metricForms.value = {
+    ...metricForms.value,
+    [record.id]: {
+      views: record.metrics?.views || 0,
+      likes: record.metrics?.likes || 0,
+      comments: record.metrics?.comments || 0,
+      shares: record.metrics?.shares || 0,
+      leads: record.metrics?.leads || 0,
+    },
+  };
 };
 
 const schedulePublish = async (draft) => {
@@ -959,7 +964,9 @@ const schedulePublish = async (draft) => {
 const updateScheduleStatus = async (schedule, status) => {
   const res = await updateWorkspacePublishSchedule(schedule.id, { status });
   if (res.code === 200) {
-    Object.assign(schedule, res.data);
+    const nextSchedule = res.data.schedule || res.data;
+    Object.assign(schedule, nextSchedule);
+    appendPublishRecord(res.data.publishRecord);
     $message.success(`计划已更新：${scheduleLabel(status)}`);
     await Promise.all([loadOverview(), loadAuditLogs()]);
   }
