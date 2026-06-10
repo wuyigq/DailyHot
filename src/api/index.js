@@ -130,6 +130,29 @@ export const getWorkspacePublishRecords = () => {
   });
 };
 
+export const getWorkspacePublishSchedules = () => {
+  return axios({
+    method: "GET",
+    url: "/workspace/publish-schedules",
+  });
+};
+
+export const createWorkspacePublishSchedule = (data) => {
+  return axios({
+    method: "POST",
+    url: "/workspace/publish-schedules",
+    data,
+  });
+};
+
+export const updateWorkspacePublishSchedule = (id, data) => {
+  return axios({
+    method: "PATCH",
+    url: `/workspace/publish-schedules/${id}`,
+    data,
+  });
+};
+
 export const createWorkspacePublishRecord = (data) => {
   return axios({
     method: "POST",

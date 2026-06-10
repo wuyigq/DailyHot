@@ -19,7 +19,7 @@
       </n-space>
     </section>
 
-    <n-grid cols="2 720:4 1100:8" :x-gap="16" :y-gap="16" class="overview-grid">
+    <n-grid cols="2 720:5 1100:10" :x-gap="16" :y-gap="16" class="overview-grid">
       <n-grid-item>
         <n-card class="metric-card">
           <n-statistic label="草稿数" :value="overview.draftCount || 0" />
@@ -28,6 +28,11 @@
       <n-grid-item>
         <n-card class="metric-card">
           <n-statistic label="发布记录" :value="overview.publishCount || 0" />
+        </n-card>
+      </n-grid-item>
+      <n-grid-item>
+        <n-card class="metric-card">
+          <n-statistic label="待发布" :value="overview.pendingScheduleCount || 0" />
         </n-card>
       </n-grid-item>
       <n-grid-item>
@@ -313,6 +318,9 @@
                 <n-button size="small" secondary @click="loadPublishPackage(draft)">
                   发布助手
                 </n-button>
+                <n-button size="small" secondary @click="schedulePublish(draft)">
+                  加入计划
+                </n-button>
                 <n-button size="small" secondary @click="copyDraft(draft.content)">
                   复制
                 </n-button>
@@ -429,6 +437,40 @@
       </n-grid-item>
     </n-grid>
 
+    <n-card class="panel schedules-panel">
+      <template #header>
+        <div class="card-header">
+          <span>发布计划队列</span>
+          <n-button size="small" secondary @click="loadPublishSchedules">刷新</n-button>
+        </div>
+      </template>
+      <n-timeline v-if="publishSchedules.length">
+        <n-timeline-item
+          v-for="schedule in publishSchedules"
+          :key="schedule.id"
+          :type="scheduleType(schedule.status)"
+          :title="`${platformLabel(schedule.platform)} · ${scheduleLabel(schedule.status)}`"
+          :time="formatDate(schedule.scheduledAt)"
+        >
+          <div class="schedule-content">
+            <p>{{ schedule.note || "等待执行发布计划" }}</p>
+            <n-space class="record-actions" justify="end">
+              <n-button size="small" secondary @click="updateScheduleStatus(schedule, 'ready')">
+                标记待发布
+              </n-button>
+              <n-button size="small" type="success" secondary @click="updateScheduleStatus(schedule, 'published')">
+                已发布
+              </n-button>
+              <n-button size="small" type="warning" secondary @click="updateScheduleStatus(schedule, 'skipped')">
+                跳过
+              </n-button>
+            </n-space>
+          </div>
+        </n-timeline-item>
+      </n-timeline>
+      <n-empty v-else description="还没有发布计划" />
+    </n-card>
+
     <n-card class="panel records-panel">
       <template #header>
         <div class="card-header">
@@ -500,6 +542,7 @@
 import {
   checkWorkspaceDraft,
   createWorkspacePublishRecord,
+  createWorkspacePublishSchedule,
   generateWorkspaceDraft,
   getWorkspaceAuditLogs,
   getWorkspaceMe,
@@ -507,6 +550,7 @@ import {
   getWorkspacePersona,
   getWorkspacePublishPackage,
   getWorkspacePublishRecords,
+  getWorkspacePublishSchedules,
   getWorkspaceDrafts,
   getWorkspaceDraftVersions,
   getWorkspaceFeed,
@@ -518,6 +562,7 @@ import {
   saveWorkspacePreferences,
   updateWorkspaceDraftReview,
   updateWorkspacePublishMetrics,
+  updateWorkspacePublishSchedule,
 } from "@/api";
 
 const categoryOptions = ["体育", "娱乐", "科技", "财经", "政治", "军事", "游戏", "社会"];
@@ -561,10 +606,13 @@ const draftOptions = ref({
 const feed = ref([]);
 const drafts = ref([]);
 const publishRecords = ref([]);
+const publishSchedules = ref([]);
 const auditLogs = ref([]);
 const overview = ref({
   draftCount: 0,
   publishCount: 0,
+  scheduleCount: 0,
+  pendingScheduleCount: 0,
   totals: {
     views: 0,
     likes: 0,
@@ -614,6 +662,7 @@ const reloadWorkspace = async () => {
     loadFeed(false),
     loadDrafts(),
     loadPublishRecords(),
+    loadPublishSchedules(),
     loadOverview(),
     loadAuditLogs(),
   ]);
@@ -711,6 +760,11 @@ const loadPublishRecords = async () => {
       return acc;
     }, {});
   }
+};
+
+const loadPublishSchedules = async () => {
+  const res = await getWorkspacePublishSchedules();
+  if (res.code === 200) publishSchedules.value = res.data;
 };
 
 const loadOverview = async () => {
@@ -885,6 +939,32 @@ const recordPublish = async (draft) => {
   }
 };
 
+const schedulePublish = async (draft) => {
+  const scheduledAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+  const res = await createWorkspacePublishSchedule({
+    draftId: draft.id,
+    platform: draft.platform,
+    scheduledAt,
+    note: "已加入发布计划，建议到点前再次检查内容和来源。",
+  });
+  if (res.code === 200) {
+    publishSchedules.value = [...publishSchedules.value, res.data].sort((a, b) =>
+      a.scheduledAt.localeCompare(b.scheduledAt)
+    );
+    $message.success("已加入发布计划");
+    await Promise.all([loadOverview(), loadAuditLogs()]);
+  }
+};
+
+const updateScheduleStatus = async (schedule, status) => {
+  const res = await updateWorkspacePublishSchedule(schedule.id, { status });
+  if (res.code === 200) {
+    Object.assign(schedule, res.data);
+    $message.success(`计划已更新：${scheduleLabel(status)}`);
+    await Promise.all([loadOverview(), loadAuditLogs()]);
+  }
+};
+
 const updateReview = async (draft, reviewStatus) => {
   const res = await updateWorkspaceDraftReview(draft.id, { reviewStatus });
   if (res.code === 200) {
@@ -962,6 +1042,26 @@ const generationType = (mode = "template") => {
   }[mode] || "default";
 };
 
+const scheduleLabel = (status = "pending") => {
+  return {
+    pending: "待排期",
+    ready: "待发布",
+    published: "已发布",
+    skipped: "已跳过",
+    failed: "失败",
+  }[status] || "待排期";
+};
+
+const scheduleType = (status = "pending") => {
+  return {
+    pending: "info",
+    ready: "warning",
+    published: "success",
+    skipped: "default",
+    failed: "error",
+  }[status] || "info";
+};
+
 const formatDate = (date) => new Date(date).toLocaleString();
 
 onMounted(async () => {
@@ -1013,6 +1113,7 @@ onMounted(async () => {
 
   .persona-panel,
   .account-panel,
+  .schedules-panel,
   .records-panel,
   .audit-panel {
     margin-top: 20px;
@@ -1168,6 +1269,7 @@ onMounted(async () => {
     }
   }
 
+  .schedule-content,
   .record-content {
     p {
       margin: 0 0 10px;
