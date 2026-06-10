@@ -19,7 +19,7 @@
       </n-space>
     </section>
 
-    <n-grid cols="2 720:4" :x-gap="16" :y-gap="16" class="overview-grid">
+    <n-grid cols="2 720:4 1100:8" :x-gap="16" :y-gap="16" class="overview-grid">
       <n-grid-item>
         <n-card class="metric-card">
           <n-statistic label="草稿数" :value="overview.draftCount || 0" />
@@ -38,6 +38,26 @@
       <n-grid-item>
         <n-card class="metric-card">
           <n-statistic label="线索数" :value="overview.totals?.leads || 0" />
+        </n-card>
+      </n-grid-item>
+      <n-grid-item>
+        <n-card class="metric-card">
+          <n-statistic label="AI 生成" :value="overview.generation?.aiCount || 0" />
+        </n-card>
+      </n-grid-item>
+      <n-grid-item>
+        <n-card class="metric-card">
+          <n-statistic label="模板回退" :value="overview.generation?.templateCount || 0" />
+        </n-card>
+      </n-grid-item>
+      <n-grid-item>
+        <n-card class="metric-card">
+          <n-statistic label="平均耗时(ms)" :value="overview.generation?.averageLatencyMs || 0" />
+        </n-card>
+      </n-grid-item>
+      <n-grid-item>
+        <n-card class="metric-card">
+          <n-statistic label="估算 Tokens" :value="overview.generation?.totalTokens || 0" />
         </n-card>
       </n-grid-item>
     </n-grid>
@@ -513,6 +533,12 @@ const overview = ref({
     comments: 0,
     shares: 0,
     leads: 0,
+  },
+  generation: {
+    aiCount: 0,
+    templateCount: 0,
+    averageLatencyMs: 0,
+    totalTokens: 0,
   },
 });
 const metricForms = ref({});
