@@ -266,6 +266,8 @@
                   <n-space>
                     <n-radio-button value="weibo">微博短评</n-radio-button>
                     <n-radio-button value="xiaohongshu">小红书笔记</n-radio-button>
+                    <n-radio-button value="article">公众号开头</n-radio-button>
+                    <n-radio-button value="moments">朋友圈动态</n-radio-button>
                     <n-radio-button value="video">视频口播</n-radio-button>
                   </n-space>
                 </n-radio-group>
@@ -703,6 +705,8 @@ const sourceOptions = [
 const platformOptions = [
   { label: "微博短评", value: "weibo" },
   { label: "小红书笔记", value: "xiaohongshu" },
+  { label: "公众号开头", value: "article" },
+  { label: "朋友圈动态", value: "moments" },
   { label: "视频口播", value: "video" },
 ];
 const draftPlatformFilterOptions = [
@@ -1234,6 +1238,8 @@ const platformLabel = (platform) => {
   return {
     weibo: "微博短评",
     xiaohongshu: "小红书笔记",
+    article: "公众号开头",
+    moments: "朋友圈动态",
     video: "视频口播",
   }[platform] || platform;
 };
