@@ -55,3 +55,41 @@ export const getWorkspaceDrafts = () => {
     url: "/workspace/drafts",
   });
 };
+
+export const getWorkspacePersona = () => {
+  return axios({
+    method: "GET",
+    url: "/workspace/persona",
+  });
+};
+
+export const saveWorkspacePersona = (data) => {
+  return axios({
+    method: "PUT",
+    url: "/workspace/persona",
+    data,
+  });
+};
+
+export const checkWorkspaceDraft = (id, data) => {
+  return axios({
+    method: "POST",
+    url: `/workspace/drafts/${id}/check`,
+    data,
+  });
+};
+
+export const getWorkspacePublishRecords = () => {
+  return axios({
+    method: "GET",
+    url: "/workspace/publish-records",
+  });
+};
+
+export const createWorkspacePublishRecord = (data) => {
+  return axios({
+    method: "POST",
+    url: "/workspace/publish-records",
+    data,
+  });
+};

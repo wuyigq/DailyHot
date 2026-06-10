@@ -65,6 +65,32 @@
             </n-form-item>
           </n-form>
         </n-card>
+        <n-card title="人设与观点库" class="panel persona-panel">
+          <n-form label-placement="top">
+            <n-form-item label="显示名称">
+              <n-input v-model:value="persona.displayName" placeholder="例如：篮球观察员" />
+            </n-form-item>
+            <n-form-item label="身份定位">
+              <n-input
+                v-model:value="persona.identity"
+                type="textarea"
+                :autosize="{ minRows: 2, maxRows: 4 }"
+              />
+            </n-form-item>
+            <n-form-item label="常用观点">
+              <n-dynamic-tags v-model:value="persona.viewpoints" />
+            </n-form-item>
+            <n-form-item label="禁用表达">
+              <n-dynamic-tags v-model:value="persona.forbiddenWords" />
+            </n-form-item>
+            <n-form-item label="表达边界">
+              <n-dynamic-tags v-model:value="persona.boundaries" />
+            </n-form-item>
+            <n-button block secondary strong :loading="personaSaving" @click="savePersona">
+              保存人设
+            </n-button>
+          </n-form>
+        </n-card>
       </n-grid-item>
 
       <n-grid-item :span="2">
@@ -183,28 +209,77 @@
                 :autosize="{ minRows: 5, maxRows: 12 }"
               />
               <n-space justify="end" class="draft-actions">
+                <n-button size="small" secondary @click="checkDraft(draft)">
+                  发布检查
+                </n-button>
                 <n-button size="small" secondary @click="copyDraft(draft.content)">
                   复制
                 </n-button>
                 <n-button size="small" type="primary" secondary @click="shareDraft(draft.content)">
                   手机分享
                 </n-button>
+                <n-button size="small" type="success" secondary @click="recordPublish(draft)">
+                  记录发布
+                </n-button>
               </n-space>
+              <n-alert
+                v-if="checkResults[draft.id]"
+                class="check-result"
+                :type="checkResults[draft.id].passed ? 'success' : 'warning'"
+                :show-icon="false"
+              >
+                <div class="check-title">
+                  {{ checkResults[draft.id].passed ? "检查通过" : "需要处理后再发布" }}
+                  <n-text :depth="3">
+                    {{ checkResults[draft.id].length }} / {{ checkResults[draft.id].limit }} 字
+                  </n-text>
+                </div>
+                <ul>
+                  <li v-for="issue in checkResults[draft.id].issues" :key="issue.message">
+                    [{{ issue.level }}] {{ issue.message }}
+                  </li>
+                </ul>
+              </n-alert>
             </article>
           </div>
           <n-empty v-else description="还没有草稿" />
         </n-card>
       </n-grid-item>
     </n-grid>
+
+    <n-card class="panel records-panel">
+      <template #header>
+        <div class="card-header">
+          <span>半自动发布记录</span>
+          <n-button size="small" secondary @click="loadPublishRecords">刷新</n-button>
+        </div>
+      </template>
+      <n-timeline v-if="publishRecords.length">
+        <n-timeline-item
+          v-for="record in publishRecords"
+          :key="record.id"
+          :type="record.status === 'failed' ? 'error' : 'success'"
+          :title="`${platformLabel(record.platform)} · ${record.status}`"
+          :content="record.note || record.publishUrl || '已记录半自动发布动作'"
+          :time="formatDate(record.createdAt)"
+        />
+      </n-timeline>
+      <n-empty v-else description="还没有发布记录" />
+    </n-card>
   </div>
 </template>
 
 <script setup>
 import {
+  checkWorkspaceDraft,
+  createWorkspacePublishRecord,
   generateWorkspaceDraft,
+  getWorkspacePersona,
+  getWorkspacePublishRecords,
   getWorkspaceDrafts,
   getWorkspaceFeed,
   getWorkspacePreferences,
+  saveWorkspacePersona,
   saveWorkspacePreferences,
 } from "@/api";
 
@@ -225,14 +300,25 @@ const preferences = ref({
   sources: [],
   tone: "balanced",
 });
+const persona = ref({
+  displayName: "",
+  identity: "",
+  voice: "balanced",
+  viewpoints: [],
+  forbiddenWords: [],
+  boundaries: [],
+});
 const draftOptions = ref({
   platform: "weibo",
   tone: "balanced",
 });
 const feed = ref([]);
 const drafts = ref([]);
+const publishRecords = ref([]);
+const checkResults = ref({});
 const selectedTopic = ref(null);
 const saving = ref(false);
+const personaSaving = ref(false);
 const feedLoading = ref(false);
 const generating = ref(false);
 const feedError = ref("");
@@ -242,6 +328,24 @@ const loadPreferences = async () => {
   if (res.code === 200) {
     preferences.value = res.data;
     draftOptions.value.tone = res.data.tone;
+  }
+};
+
+const loadPersona = async () => {
+  const res = await getWorkspacePersona();
+  if (res.code === 200) persona.value = res.data;
+};
+
+const savePersona = async () => {
+  personaSaving.value = true;
+  try {
+    const res = await saveWorkspacePersona(persona.value);
+    if (res.code === 200) {
+      persona.value = res.data;
+      $message.success("人设已保存");
+    }
+  } finally {
+    personaSaving.value = false;
   }
 };
 
@@ -279,6 +383,11 @@ const loadFeed = async (isNew = false) => {
 const loadDrafts = async () => {
   const res = await getWorkspaceDrafts();
   if (res.code === 200) drafts.value = res.data;
+};
+
+const loadPublishRecords = async () => {
+  const res = await getWorkspacePublishRecords();
+  if (res.code === 200) publishRecords.value = res.data;
 };
 
 const selectTopic = (topic) => {
@@ -321,6 +430,32 @@ const shareDraft = async (content) => {
   }
 };
 
+const checkDraft = async (draft) => {
+  const res = await checkWorkspaceDraft(draft.id, { content: draft.content });
+  if (res.code === 200) {
+    checkResults.value = {
+      ...checkResults.value,
+      [draft.id]: res.data,
+    };
+    $message[res.data.passed ? "success" : "warning"](
+      res.data.passed ? "发布检查通过" : "发布前仍有风险项"
+    );
+  }
+};
+
+const recordPublish = async (draft) => {
+  const res = await createWorkspacePublishRecord({
+    draftId: draft.id,
+    platform: draft.platform,
+    status: "assisted",
+    note: "已复制或分享到目标平台，等待用户手动确认发布。",
+  });
+  if (res.code === 200) {
+    publishRecords.value = [res.data, ...publishRecords.value];
+    $message.success("发布动作已记录");
+  }
+};
+
 const riskLabel = (risk) => {
   return {
     low: "低风险",
@@ -348,8 +483,8 @@ const platformLabel = (platform) => {
 const formatDate = (date) => new Date(date).toLocaleString();
 
 onMounted(async () => {
-  await loadPreferences();
-  await Promise.all([loadFeed(false), loadDrafts()]);
+  await Promise.all([loadPreferences(), loadPersona()]);
+  await Promise.all([loadFeed(false), loadDrafts(), loadPublishRecords()]);
 });
 </script>
 
@@ -385,6 +520,11 @@ onMounted(async () => {
   .panel {
     height: 100%;
     border-radius: 16px;
+  }
+
+  .persona-panel,
+  .records-panel {
+    margin-top: 20px;
   }
 
   .card-header {
@@ -470,6 +610,24 @@ onMounted(async () => {
 
     .draft-actions {
       margin-top: 12px;
+    }
+
+    .check-result {
+      margin-top: 12px;
+
+      .check-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 6px;
+        font-weight: 700;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 18px;
+      }
     }
   }
 
