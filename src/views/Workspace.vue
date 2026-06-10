@@ -253,6 +253,9 @@
             <article v-for="draft in drafts" :key="draft.id" class="draft">
               <div class="draft-meta">
                 <n-tag size="small" round>{{ platformLabel(draft.platform) }}</n-tag>
+                <n-tag size="small" round :type="generationType(draft.generationMode)">
+                  {{ generationLabel(draft.generationMode) }}
+                </n-tag>
                 <n-text :depth="3">{{ formatDate(draft.createdAt) }}</n-text>
               </div>
               <h3>{{ draft.topic.title }}</h3>
@@ -673,7 +676,7 @@ const generateDraft = async () => {
       ...draftOptions.value,
     });
     if (res.code === 200) {
-      $message.success("草稿已生成");
+      $message.success(`草稿已生成：${generationLabel(res.data.generationMode)}`);
       drafts.value = [res.data, ...drafts.value];
       await Promise.all([loadOverview(), loadAuditLogs()]);
     }
@@ -838,6 +841,20 @@ const reviewType = (status = "draft") => {
     approved: "success",
     rejected: "error",
   }[status] || "default";
+};
+
+const generationLabel = (mode = "template") => {
+  return {
+    ai: "AI 生成",
+    template: "模板生成",
+  }[mode] || "模板生成";
+};
+
+const generationType = (mode = "template") => {
+  return {
+    ai: "success",
+    template: "default",
+  }[mode] || "default";
 };
 
 const formatDate = (date) => new Date(date).toLocaleString();
