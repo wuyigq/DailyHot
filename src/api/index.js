@@ -93,3 +93,33 @@ export const createWorkspacePublishRecord = (data) => {
     data,
   });
 };
+
+export const updateWorkspaceDraftReview = (id, data) => {
+  return axios({
+    method: "PATCH",
+    url: `/workspace/drafts/${id}/review`,
+    data,
+  });
+};
+
+export const updateWorkspacePublishMetrics = (id, data) => {
+  return axios({
+    method: "PATCH",
+    url: `/workspace/publish-records/${id}/metrics`,
+    data,
+  });
+};
+
+export const getWorkspaceOverview = () => {
+  return axios({
+    method: "GET",
+    url: "/workspace/overview",
+  });
+};
+
+export const getWorkspaceAuditLogs = () => {
+  return axios({
+    method: "GET",
+    url: "/workspace/audit-logs",
+  });
+};

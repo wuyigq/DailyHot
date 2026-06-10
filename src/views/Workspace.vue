@@ -19,6 +19,29 @@
       </n-space>
     </section>
 
+    <n-grid cols="2 720:4" :x-gap="16" :y-gap="16" class="overview-grid">
+      <n-grid-item>
+        <n-card class="metric-card">
+          <n-statistic label="草稿数" :value="overview.draftCount || 0" />
+        </n-card>
+      </n-grid-item>
+      <n-grid-item>
+        <n-card class="metric-card">
+          <n-statistic label="发布记录" :value="overview.publishCount || 0" />
+        </n-card>
+      </n-grid-item>
+      <n-grid-item>
+        <n-card class="metric-card">
+          <n-statistic label="总曝光" :value="overview.totals?.views || 0" />
+        </n-card>
+      </n-grid-item>
+      <n-grid-item>
+        <n-card class="metric-card">
+          <n-statistic label="线索数" :value="overview.totals?.leads || 0" />
+        </n-card>
+      </n-grid-item>
+    </n-grid>
+
     <n-grid cols="1 980:3" :x-gap="20" :y-gap="20">
       <n-grid-item>
         <n-card title="订阅设置" class="panel">
@@ -203,6 +226,22 @@
                 <n-text :depth="3">{{ formatDate(draft.createdAt) }}</n-text>
               </div>
               <h3>{{ draft.topic.title }}</h3>
+              <div class="review-row">
+                <n-tag size="small" :type="reviewType(draft.reviewStatus)">
+                  {{ reviewLabel(draft.reviewStatus) }}
+                </n-tag>
+                <n-space size="small">
+                  <n-button size="tiny" secondary @click="updateReview(draft, 'reviewing')">
+                    送审
+                  </n-button>
+                  <n-button size="tiny" type="success" secondary @click="updateReview(draft, 'approved')">
+                    通过
+                  </n-button>
+                  <n-button size="tiny" type="error" secondary @click="updateReview(draft, 'rejected')">
+                    驳回
+                  </n-button>
+                </n-space>
+              </div>
               <n-input
                 v-model:value="draft.content"
                 type="textarea"
@@ -260,11 +299,56 @@
           :key="record.id"
           :type="record.status === 'failed' ? 'error' : 'success'"
           :title="`${platformLabel(record.platform)} · ${record.status}`"
-          :content="record.note || record.publishUrl || '已记录半自动发布动作'"
           :time="formatDate(record.createdAt)"
-        />
+        >
+          <div class="record-content">
+            <p>{{ record.note || record.publishUrl || "已记录半自动发布动作" }}</p>
+            <n-grid cols="2 640:5" :x-gap="8" :y-gap="8">
+              <n-grid-item>
+                <n-input-number v-model:value="metricForms[record.id].views" size="small" placeholder="曝光" />
+              </n-grid-item>
+              <n-grid-item>
+                <n-input-number v-model:value="metricForms[record.id].likes" size="small" placeholder="点赞" />
+              </n-grid-item>
+              <n-grid-item>
+                <n-input-number v-model:value="metricForms[record.id].comments" size="small" placeholder="评论" />
+              </n-grid-item>
+              <n-grid-item>
+                <n-input-number v-model:value="metricForms[record.id].shares" size="small" placeholder="转发" />
+              </n-grid-item>
+              <n-grid-item>
+                <n-input-number v-model:value="metricForms[record.id].leads" size="small" placeholder="线索" />
+              </n-grid-item>
+            </n-grid>
+            <n-space class="record-actions" justify="end">
+              <n-button size="small" secondary @click="saveMetrics(record)">
+                保存指标
+              </n-button>
+            </n-space>
+          </div>
+        </n-timeline-item>
       </n-timeline>
       <n-empty v-else description="还没有发布记录" />
+    </n-card>
+
+    <n-card class="panel audit-panel">
+      <template #header>
+        <div class="card-header">
+          <span>合规审计日志</span>
+          <n-button size="small" secondary @click="loadAuditLogs">刷新</n-button>
+        </div>
+      </template>
+      <n-timeline v-if="auditLogs.length">
+        <n-timeline-item
+          v-for="log in auditLogs"
+          :key="log.id"
+          type="info"
+          :title="log.action"
+          :content="`${log.targetType}: ${log.targetId}`"
+          :time="formatDate(log.createdAt)"
+        />
+      </n-timeline>
+      <n-empty v-else description="还没有审计记录" />
     </n-card>
   </div>
 </template>
@@ -274,6 +358,8 @@ import {
   checkWorkspaceDraft,
   createWorkspacePublishRecord,
   generateWorkspaceDraft,
+  getWorkspaceAuditLogs,
+  getWorkspaceOverview,
   getWorkspacePersona,
   getWorkspacePublishRecords,
   getWorkspaceDrafts,
@@ -281,6 +367,8 @@ import {
   getWorkspacePreferences,
   saveWorkspacePersona,
   saveWorkspacePreferences,
+  updateWorkspaceDraftReview,
+  updateWorkspacePublishMetrics,
 } from "@/api";
 
 const categoryOptions = ["体育", "娱乐", "科技", "财经", "政治", "军事", "游戏", "社会"];
@@ -315,6 +403,19 @@ const draftOptions = ref({
 const feed = ref([]);
 const drafts = ref([]);
 const publishRecords = ref([]);
+const auditLogs = ref([]);
+const overview = ref({
+  draftCount: 0,
+  publishCount: 0,
+  totals: {
+    views: 0,
+    likes: 0,
+    comments: 0,
+    shares: 0,
+    leads: 0,
+  },
+});
+const metricForms = ref({});
 const checkResults = ref({});
 const selectedTopic = ref(null);
 const saving = ref(false);
@@ -387,7 +488,29 @@ const loadDrafts = async () => {
 
 const loadPublishRecords = async () => {
   const res = await getWorkspacePublishRecords();
-  if (res.code === 200) publishRecords.value = res.data;
+  if (res.code === 200) {
+    publishRecords.value = res.data;
+    metricForms.value = res.data.reduce((acc, record) => {
+      acc[record.id] = {
+        views: record.metrics?.views || 0,
+        likes: record.metrics?.likes || 0,
+        comments: record.metrics?.comments || 0,
+        shares: record.metrics?.shares || 0,
+        leads: record.metrics?.leads || 0,
+      };
+      return acc;
+    }, {});
+  }
+};
+
+const loadOverview = async () => {
+  const res = await getWorkspaceOverview();
+  if (res.code === 200) overview.value = res.data;
+};
+
+const loadAuditLogs = async () => {
+  const res = await getWorkspaceAuditLogs();
+  if (res.code === 200) auditLogs.value = res.data;
 };
 
 const selectTopic = (topic) => {
@@ -410,6 +533,7 @@ const generateDraft = async () => {
     if (res.code === 200) {
       $message.success("草稿已生成");
       drafts.value = [res.data, ...drafts.value];
+      await Promise.all([loadOverview(), loadAuditLogs()]);
     }
   } finally {
     generating.value = false;
@@ -440,6 +564,7 @@ const checkDraft = async (draft) => {
     $message[res.data.passed ? "success" : "warning"](
       res.data.passed ? "发布检查通过" : "发布前仍有风险项"
     );
+    await loadAuditLogs();
   }
 };
 
@@ -452,7 +577,39 @@ const recordPublish = async (draft) => {
   });
   if (res.code === 200) {
     publishRecords.value = [res.data, ...publishRecords.value];
+    metricForms.value = {
+      ...metricForms.value,
+      [res.data.id]: {
+        views: 0,
+        likes: 0,
+        comments: 0,
+        shares: 0,
+        leads: 0,
+      },
+    };
     $message.success("发布动作已记录");
+    await Promise.all([loadOverview(), loadAuditLogs()]);
+  }
+};
+
+const updateReview = async (draft, reviewStatus) => {
+  const res = await updateWorkspaceDraftReview(draft.id, { reviewStatus });
+  if (res.code === 200) {
+    Object.assign(draft, res.data);
+    $message.success(`已更新为：${reviewLabel(reviewStatus)}`);
+    await Promise.all([loadOverview(), loadAuditLogs()]);
+  }
+};
+
+const saveMetrics = async (record) => {
+  const res = await updateWorkspacePublishMetrics(record.id, {
+    ...metricForms.value[record.id],
+    status: "published",
+  });
+  if (res.code === 200) {
+    Object.assign(record, res.data);
+    $message.success("发布指标已保存");
+    await Promise.all([loadOverview(), loadAuditLogs()]);
   }
 };
 
@@ -480,11 +637,35 @@ const platformLabel = (platform) => {
   }[platform] || platform;
 };
 
+const reviewLabel = (status = "draft") => {
+  return {
+    draft: "草稿",
+    reviewing: "审核中",
+    approved: "已通过",
+    rejected: "已驳回",
+  }[status] || "草稿";
+};
+
+const reviewType = (status = "draft") => {
+  return {
+    draft: "default",
+    reviewing: "warning",
+    approved: "success",
+    rejected: "error",
+  }[status] || "default";
+};
+
 const formatDate = (date) => new Date(date).toLocaleString();
 
 onMounted(async () => {
   await Promise.all([loadPreferences(), loadPersona()]);
-  await Promise.all([loadFeed(false), loadDrafts(), loadPublishRecords()]);
+  await Promise.all([
+    loadFeed(false),
+    loadDrafts(),
+    loadPublishRecords(),
+    loadOverview(),
+    loadAuditLogs(),
+  ]);
 });
 </script>
 
@@ -522,8 +703,17 @@ onMounted(async () => {
     border-radius: 16px;
   }
 
+  .overview-grid {
+    margin-bottom: 20px;
+  }
+
+  .metric-card {
+    border-radius: 16px;
+  }
+
   .persona-panel,
-  .records-panel {
+  .records-panel,
+  .audit-panel {
     margin-top: 20px;
   }
 
@@ -602,10 +792,17 @@ onMounted(async () => {
     }
 
     .draft-meta,
-    .draft-actions {
+    .draft-actions,
+    .review-row {
       display: flex;
       align-items: center;
       gap: 10px;
+    }
+
+    .review-row {
+      justify-content: space-between;
+      margin: 10px 0;
+      flex-wrap: wrap;
     }
 
     .draft-actions {
@@ -628,6 +825,16 @@ onMounted(async () => {
         margin: 0;
         padding-left: 18px;
       }
+    }
+  }
+
+  .record-content {
+    p {
+      margin: 0 0 10px;
+    }
+
+    .record-actions {
+      margin-top: 10px;
     }
   }
 
