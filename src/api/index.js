@@ -17,3 +17,41 @@ export const getHotLists = (type, isNew = false, params) => {
     },
   });
 };
+
+export const getWorkspacePreferences = () => {
+  return axios({
+    method: "GET",
+    url: "/workspace/preferences",
+  });
+};
+
+export const saveWorkspacePreferences = (data) => {
+  return axios({
+    method: "PUT",
+    url: "/workspace/preferences",
+    data,
+  });
+};
+
+export const getWorkspaceFeed = (params) => {
+  return axios({
+    method: "GET",
+    url: "/workspace/feed",
+    params,
+  });
+};
+
+export const generateWorkspaceDraft = (data) => {
+  return axios({
+    method: "POST",
+    url: "/workspace/generate",
+    data,
+  });
+};
+
+export const getWorkspaceDrafts = () => {
+  return axios({
+    method: "GET",
+    url: "/workspace/drafts",
+  });
+};

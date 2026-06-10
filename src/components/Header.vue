@@ -58,6 +58,14 @@
           </n-popover>
           <n-popover>
             <template #trigger>
+              <n-button secondary strong round @click="router.push('/workspace')">
+                热点工作台
+              </n-button>
+            </template>
+            AI 选题与草稿
+          </n-popover>
+          <n-popover>
+            <template #trigger>
               <n-button secondary strong round @click="router.push('/setting')">
                 <template #icon>
                   <n-icon :component="SettingTwo" />
@@ -174,6 +182,15 @@ const menuOptions = [
     },
   },
   {
+    label: "热点工作台",
+    key: "workspace",
+    icon: () => {
+      return h(NIcon, null, {
+        default: () => h(Refresh),
+      });
+    },
+  },
+  {
     label: "全局设置",
     key: "setting",
     icon: () => {
@@ -190,6 +207,8 @@ const menuOptionsSelect = (val) => {
     router.go(0);
   } else if (val === "changeTheme") {
     store.setSiteTheme(store.siteTheme === "light" ? "dark" : "light");
+  } else if (val === "workspace") {
+    router.push("/workspace");
   } else if (val === "setting") {
     router.push("/setting");
   }

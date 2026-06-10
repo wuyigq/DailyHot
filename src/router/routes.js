@@ -26,6 +26,15 @@ const routes = [
     },
     component: () => import("@/views/Setting.vue"),
   },
+  // 热点内容工作台
+  {
+    path: "/workspace",
+    name: "workspace",
+    meta: {
+      title: "热点工作台",
+    },
+    component: () => import("@/views/Workspace.vue"),
+  },
   // 测试页面
   {
     path: "/test",
