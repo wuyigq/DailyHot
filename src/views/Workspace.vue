@@ -232,6 +232,34 @@
             <n-alert type="info" :show-icon="false">
               已选择：{{ selectedTopic.title }}
             </n-alert>
+            <div class="topic-detail">
+              <n-space size="small" class="topic-meta">
+                <n-tag size="small" round>
+                  {{ selectedTopic.relatedSources?.length || 1 }} 个来源
+                </n-tag>
+                <n-tag size="small" :type="riskType(selectedTopic.riskLevel)" round>
+                  {{ riskLabel(selectedTopic.riskLevel) }}
+                </n-tag>
+                <n-text v-if="selectedTopic.firstSeenAt" :depth="3">
+                  首见：{{ formatDate(selectedTopic.firstSeenAt) }}
+                </n-text>
+                <n-text v-if="selectedTopic.latestSeenAt" :depth="3">
+                  最新：{{ formatDate(selectedTopic.latestSeenAt) }}
+                </n-text>
+              </n-space>
+              <p v-if="selectedTopic.desc">{{ selectedTopic.desc }}</p>
+              <n-space size="small" class="source-links">
+                <n-button
+                  v-for="source in selectedTopic.relatedSources || [selectedTopic]"
+                  :key="`${source.source}-${source.url}`"
+                  size="tiny"
+                  secondary
+                  @click="openTopic(source)"
+                >
+                  {{ source.sourceTitle || source.source }}
+                </n-button>
+              </n-space>
+            </div>
             <n-form label-placement="top" class="generate-form">
               <n-form-item label="平台模板">
                 <n-radio-group v-model:value="draftOptions.platform">
@@ -667,6 +695,10 @@ const sourceOptions = [
   { label: "抖音", name: "douyin" },
   { label: "今日头条", name: "toutiao" },
   { label: "IT之家", name: "ithome" },
+  { label: "百度", name: "baidu" },
+  { label: "腾讯新闻", name: "qq-news" },
+  { label: "新浪新闻", name: "sina-news" },
+  { label: "澎湃新闻", name: "thepaper" },
 ];
 const platformOptions = [
   { label: "微博短评", value: "weibo" },
@@ -1413,6 +1445,23 @@ onMounted(async () => {
 
   .generate-form {
     margin-top: 18px;
+  }
+
+  .topic-detail {
+    margin-top: 12px;
+    padding: 14px;
+    border: 1px solid var(--n-border-color);
+    border-radius: 14px;
+
+    p {
+      margin: 10px 0;
+      color: var(--n-text-color-2);
+      line-height: 1.7;
+    }
+
+    .source-links {
+      margin-top: 8px;
+    }
   }
 
   .draft {
