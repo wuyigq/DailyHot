@@ -207,6 +207,13 @@ export const getWorkspaceOverview = () => {
   });
 };
 
+export const getWorkspaceInsights = () => {
+  return axios({
+    method: "GET",
+    url: "/workspace/insights",
+  });
+};
+
 export const getWorkspaceAuditLogs = () => {
   return axios({
     method: "GET",

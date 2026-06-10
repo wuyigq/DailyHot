@@ -67,7 +67,7 @@ axios.interceptors.response.use(
           break;
       }
     } else {
-      $message.error(data.message ? data.message : "请求失败，请稍后重试");
+      $message.error("请求失败，请检查网络或后端服务");
     }
     return Promise.reject(error);
   }

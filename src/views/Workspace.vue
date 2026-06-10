@@ -315,10 +315,10 @@
                 <n-button size="small" secondary @click="checkDraft(draft)">
                   发布检查
                 </n-button>
-                <n-button size="small" secondary @click="loadPublishPackage(draft)">
+                <n-button size="small" secondary :disabled="isPublishBlocked(draft)" @click="loadPublishPackage(draft)">
                   发布助手
                 </n-button>
-                <n-button size="small" secondary @click="schedulePublish(draft)">
+                <n-button size="small" secondary :disabled="isPublishBlocked(draft)" @click="schedulePublish(draft)">
                   加入计划
                 </n-button>
                 <n-button size="small" secondary @click="copyDraft(draft.content)">
@@ -327,10 +327,18 @@
                 <n-button size="small" type="primary" secondary @click="shareDraft(draft.content)">
                   手机分享
                 </n-button>
-                <n-button size="small" type="success" secondary @click="recordPublish(draft)">
+                <n-button size="small" type="success" secondary :disabled="isPublishBlocked(draft)" @click="recordPublish(draft)">
                   记录发布
                 </n-button>
               </n-space>
+              <n-alert
+                v-if="isPublishBlocked(draft)"
+                class="check-result"
+                type="warning"
+                :show-icon="false"
+              >
+                高风险草稿必须审核通过后才能进入发布流程。
+              </n-alert>
               <n-alert
                 v-if="checkResults[draft.id]"
                 class="check-result"
@@ -436,6 +444,32 @@
         </n-card>
       </n-grid-item>
     </n-grid>
+
+    <n-card class="panel insights-panel">
+      <template #header>
+        <div class="card-header">
+          <span>内容复盘建议</span>
+          <n-button size="small" secondary @click="loadInsights">刷新</n-button>
+        </div>
+      </template>
+      <n-grid cols="1 760:4" :x-gap="12" :y-gap="12">
+        <n-grid-item>
+          <n-statistic label="待发布计划" :value="insights.pendingScheduleCount || 0" />
+        </n-grid-item>
+        <n-grid-item>
+          <n-statistic label="未回填记录" :value="insights.unmeasuredRecordCount || 0" />
+        </n-grid-item>
+        <n-grid-item>
+          <n-statistic label="高风险草稿" :value="insights.highRiskDraftCount || 0" />
+        </n-grid-item>
+        <n-grid-item>
+          <n-statistic label="平台样本" :value="insights.rankedPlatforms?.length || 0" />
+        </n-grid-item>
+      </n-grid>
+      <ul class="insight-list">
+        <li v-for="item in insights.suggestions" :key="item">{{ item }}</li>
+      </ul>
+    </n-card>
 
     <n-card class="panel accounts-panel">
       <template #header>
@@ -598,6 +632,7 @@ import {
   getWorkspaceDrafts,
   getWorkspaceDraftVersions,
   getWorkspaceFeed,
+  getWorkspaceInsights,
   getWorkspacePreferences,
   loginWorkspace,
   restoreWorkspaceDraftVersion,
@@ -683,6 +718,14 @@ const overview = ref({
     totalTokens: 0,
   },
 });
+const insights = ref({
+  rankedPlatforms: [],
+  bestRecord: null,
+  pendingScheduleCount: 0,
+  unmeasuredRecordCount: 0,
+  highRiskDraftCount: 0,
+  suggestions: [],
+});
 const metricForms = ref({});
 const checkResults = ref({});
 const publishPackages = ref({});
@@ -721,6 +764,7 @@ const reloadWorkspace = async () => {
     loadPublishRecords(),
     loadPublishSchedules(),
     loadOverview(),
+    loadInsights(),
     loadAuditLogs(),
   ]);
 };
@@ -847,6 +891,11 @@ const loadPublishSchedules = async () => {
 const loadOverview = async () => {
   const res = await getWorkspaceOverview();
   if (res.code === 200) overview.value = res.data;
+};
+
+const loadInsights = async () => {
+  const res = await getWorkspaceInsights();
+  if (res.code === 200) insights.value = res.data;
 };
 
 const loadAuditLogs = async () => {
@@ -1090,6 +1139,10 @@ const riskType = (risk) => {
   }[risk];
 };
 
+const isPublishBlocked = (draft) => {
+  return draft.topic?.riskLevel === "high" && draft.reviewStatus !== "approved";
+};
+
 const platformLabel = (platform) => {
   return {
     weibo: "微博短评",
@@ -1205,6 +1258,7 @@ onMounted(async () => {
 
   .persona-panel,
   .account-panel,
+  .insights-panel,
   .accounts-panel,
   .schedules-panel,
   .records-panel,
@@ -1226,6 +1280,15 @@ onMounted(async () => {
       flex-wrap: wrap;
       gap: 8px;
       margin-top: 14px;
+    }
+  }
+
+  .insights-panel {
+    .insight-list {
+      margin: 14px 0 0;
+      padding-left: 18px;
+      color: var(--n-text-color-2);
+      line-height: 1.8;
     }
   }
 
