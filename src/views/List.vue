@@ -1,20 +1,26 @@
 <template>
   <div class="list">
     <n-space class="type" v-if="store.newsArr[0]">
-      <n-tag
-        round
-        size="large"
-        class="tag"
+        <n-tag
+          round
+          size="large"
+          class="tag"
         v-for="item in store.newsArr.filter((item) => item.show)"
         :key="item"
         :type="item.name === listType ? 'primary' : 'default'"
         @click="changeType(item.name)"
-      >
-        {{ item.label }}
-        <template #avatar>
-          <img :src="`/logo/${item.name}.png`" alt="logo" class="logo" />
-        </template>
-      </n-tag>
+        >
+          {{ item.label }}
+          <template #avatar>
+          <img
+            :src="logoUrl(item.name, item.path)"
+            :data-icon-candidates="logoCandidates(item.name, item.path)"
+            @error="onSourceIconError"
+            alt="logo"
+            class="logo"
+          />
+          </template>
+        </n-tag>
     </n-space>
     <n-card class="card">
       <template #header>
@@ -27,7 +33,12 @@
           <template v-else>
             <div class="header">
               <div class="logo">
-                <img :src="`/logo/${listType}.png`" alt="logo" />
+                <img
+                  :src="logoUrl(listType, listData?.link)"
+                  :data-icon-candidates="logoCandidates(listType, listData?.link)"
+                  @error="onSourceIconError"
+                  alt="logo"
+                />
               </div>
               <div class="name">
                 <n-text class="title">{{ listData.title }}</n-text>
@@ -125,26 +136,33 @@ import { mainStore } from "@/store";
 import { useRouter } from "vue-router";
 import { formatTime } from "@/utils/getTime";
 import { getHotLists } from "@/api";
+import {
+  getSourceIconCandidatesAttr,
+  getSourceIconUrl,
+  onSourceIconError,
+} from "@/utils/sourceIcon";
 
 const router = useRouter();
 const store = mainStore();
 
 const updateTime = ref(null);
-const listType = ref(
-  router.currentRoute.value.query.type || store.newsArr[0].name
-);
+const listType = ref(router.currentRoute.value.query.type || null);
 const pageNumber = ref(
   router.currentRoute.value.query.page
     ? Number(router.currentRoute.value.query.page)
     : 1
 );
 const listData = ref(null);
+const logoUrl = (name, link) => getSourceIconUrl(name, link);
+const logoCandidates = (name, link) =>
+  getSourceIconCandidatesAttr(name, link);
 
 // 获取热榜数据
 const getHotListsData = async (name, isNew = false) => {
+  if (!name) return;
   listData.value = null;
-  const item = store.newsArr.find((item) => item.name == name)
-  getHotLists(item.name, isNew, item.params).then((res) => {
+  const item = store.newsArr.find((item) => item.name == name);
+  getHotLists(item?.name || name, isNew, item?.params).then((res) => {
     console.log(res);
     if (res.code === 200) {
       listData.value = res;
@@ -206,16 +224,34 @@ watch(
   () => router.currentRoute.value,
   (val) => {
     if (val.name === "list") {
-      listType.value = val.query.type;
+      listType.value = val.query.type || store.newsArr[0]?.name || null;
       pageNumber.value = Number(val.query.page);
-      getHotListsData(listType.value);
+      if (listType.value) {
+        getHotListsData(listType.value);
+      }
     }
   }
 );
 
 onMounted(() => {
-  getHotListsData(listType.value);
+  if (!listType.value && store.newsArr[0]) {
+    listType.value = store.newsArr[0].name;
+  }
+  if (listType.value) {
+    getHotListsData(listType.value);
+  }
 });
+
+watch(
+  () => store.newsArr,
+  (val) => {
+    if (!listType.value && val[0]) {
+      listType.value = val[0].name;
+      getHotListsData(listType.value);
+    }
+  },
+  { deep: true }
+);
 </script>
 
 <style lang="scss" scoped>

@@ -110,7 +110,13 @@
             :content-style="{ display: 'flex', alignItems: 'center' }"
           >
             <div class="desc" :style="{ opacity: element.show ? null : 0.6 }">
-              <img class="logo" :src="`/logo/${element.name}.png`" alt="logo" />
+              <img
+                class="logo"
+                :src="logoUrl(element.name, element.path)"
+                :data-icon-candidates="logoCandidates(element.name, element.path)"
+                @error="onSourceIconError"
+                alt="logo"
+              />
               <n-text class="news-name" v-html="element.label" />
             </div>
             <n-switch
@@ -148,6 +154,11 @@ import { storeToRefs } from "pinia";
 import { mainStore } from "@/store";
 import { useOsTheme } from "naive-ui";
 import draggable from "vuedraggable";
+import {
+  getSourceIconCandidatesAttr,
+  getSourceIconUrl,
+  onSourceIconError,
+} from "@/utils/sourceIcon";
 
 const store = mainStore();
 const osThemeRef = useOsTheme();
@@ -183,6 +194,10 @@ const linkOptions = [
     value: "href",
   },
 ];
+
+const logoUrl = (name, link) => getSourceIconUrl(name, link);
+const logoCandidates = (name, link) =>
+  getSourceIconCandidatesAttr(name, link);
 
 // 开启明暗自动跟随
 const themeAutoOpen = (val) => {

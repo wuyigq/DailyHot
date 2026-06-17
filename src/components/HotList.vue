@@ -11,10 +11,12 @@
     <template #header>
       <n-space class="title" justify="space-between">
         <div class="name">
-          <n-avatar
+          <img
             class="ico"
-            :src="`/logo/${hotData.name}.png`"
-            fallback-src="/ico/icon_error.png"
+            :src="logoUrl"
+            :data-icon-candidates="logoCandidates"
+            @error="onSourceIconError"
+            alt="logo"
           />
           <n-text class="name-text">{{ hotData.label }}</n-text>
         </div>
@@ -139,6 +141,11 @@
 import { Refresh, More } from "@icon-park/vue-next";
 import { getHotLists } from "@/api";
 import { formatTime } from "@/utils/getTime";
+import {
+  getSourceIconCandidatesAttr,
+  getSourceIconUrl,
+  onSourceIconError,
+} from "@/utils/sourceIcon";
 import { mainStore } from "@/store";
 import { useRouter } from "vue-router";
 
@@ -151,7 +158,6 @@ const props = defineProps({
     default: {},
   },
 });
-
 // 更新时间
 const updateTime = ref(null);
 
@@ -165,6 +171,13 @@ const hotListData = ref(null);
 const scrollbarRef = ref(null);
 const listLoading = ref(false);
 const loadingError = ref(false);
+
+const logoUrl = computed(() =>
+  getSourceIconUrl(props.hotData.name, hotListData.value?.link)
+);
+const logoCandidates = computed(() =>
+  getSourceIconCandidatesAttr(props.hotData.name, hotListData.value?.link)
+);
 
 // 获取热榜数据
 const getHotListsData = async (name, isNew = false) => {
@@ -277,11 +290,12 @@ onMounted(() => {
     .name {
       display: flex;
       align-items: center;
-      .n-avatar {
+      .ico {
         background-color: transparent;
         width: 20px;
         height: 20px;
         margin-right: 8px;
+        border-radius: 50%;
       }
     }
 

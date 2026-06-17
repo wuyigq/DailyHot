@@ -18,6 +18,17 @@ export const getHotLists = (type, isNew = false, params) => {
   });
 };
 
+export const getAllRoutes = (page = 1, pageSize = 20) => {
+  return axios({
+    method: "GET",
+    url: "/all",
+    params: {
+      page,
+      pageSize,
+    },
+  });
+};
+
 export const getWorkspacePreferences = () => {
   return axios({
     method: "GET",
