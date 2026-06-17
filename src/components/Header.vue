@@ -58,11 +58,19 @@
           </n-popover>
           <n-popover>
             <template #trigger>
-              <n-button secondary strong round @click="router.push('/workspace')">
-                热点工作台
+              <n-button secondary strong round @click="router.push('/merchant/login')">
+                商家工作台
               </n-button>
             </template>
-            AI 选题与草稿
+            登录、入驻与配置
+          </n-popover>
+          <n-popover>
+            <template #trigger>
+              <n-button secondary strong round @click="router.push('/workspace')">
+                商家工作台
+              </n-button>
+            </template>
+            热点获客与草稿
           </n-popover>
           <n-popover>
             <template #trigger>
@@ -182,7 +190,16 @@ const menuOptions = [
     },
   },
   {
-    label: "热点工作台",
+    label: "商家工作台",
+    key: "merchant",
+    icon: () => {
+      return h(NIcon, null, {
+        default: () => h(Refresh),
+      });
+    },
+  },
+  {
+    label: "商家工作台",
     key: "workspace",
     icon: () => {
       return h(NIcon, null, {
@@ -207,6 +224,8 @@ const menuOptionsSelect = (val) => {
     router.go(0);
   } else if (val === "changeTheme") {
     store.setSiteTheme(store.siteTheme === "light" ? "dark" : "light");
+  } else if (val === "merchant") {
+    router.push("/merchant/login");
   } else if (val === "workspace") {
     router.push("/workspace");
   } else if (val === "setting") {

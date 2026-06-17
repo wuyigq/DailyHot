@@ -51,6 +51,21 @@ export const getWorkspaceMe = () => {
   });
 };
 
+export const getWorkspaceMerchantProfile = () => {
+  return axios({
+    method: "GET",
+    url: "/workspace/merchant-profile",
+  });
+};
+
+export const saveWorkspaceMerchantProfile = (data) => {
+  return axios({
+    method: "PUT",
+    url: "/workspace/merchant-profile",
+    data,
+  });
+};
+
 export const saveWorkspacePreferences = (data) => {
   return axios({
     method: "PUT",
@@ -63,6 +78,14 @@ export const getWorkspaceFeed = (params) => {
   return axios({
     method: "GET",
     url: "/workspace/feed",
+    params,
+  });
+};
+
+export const getWorkspaceTopicDetail = (topicId, params) => {
+  return axios({
+    method: "GET",
+    url: `/workspace/feed/${topicId}`,
     params,
   });
 };

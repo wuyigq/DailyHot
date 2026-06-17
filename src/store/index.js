@@ -344,3 +344,5 @@ export const mainStore = defineStore("mainData", {
     },
   ],
 });
+
+export { workspaceStore } from "@/store/workspace";

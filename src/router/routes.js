@@ -31,9 +31,68 @@ const routes = [
     path: "/workspace",
     name: "workspace",
     meta: {
-      title: "热点工作台",
+      title: "热点内容获客工作台",
     },
-    component: () => import("@/views/Workspace.vue"),
+    component: () => import("@/views/workspace/WorkspaceLayout.vue"),
+    redirect: "/workspace/setup",
+    children: [
+      {
+        path: "setup",
+        name: "workspace-setup",
+        meta: {
+          title: "商家设置",
+        },
+        component: () => import("@/views/workspace/WorkspaceSetup.vue"),
+      },
+      {
+        path: "topics",
+        name: "workspace-topics",
+        meta: {
+          title: "行业热点",
+        },
+        component: () => import("@/views/workspace/WorkspaceTopics.vue"),
+      },
+      {
+        path: "topics/:topicId",
+        name: "workspace-topic-detail",
+        meta: {
+          title: "热点详情与生成",
+        },
+        component: () => import("@/views/workspace/WorkspaceTopicDetail.vue"),
+      },
+      {
+        path: "drafts",
+        name: "workspace-drafts",
+        meta: {
+          title: "草稿箱",
+        },
+        component: () => import("@/views/workspace/WorkspaceDrafts.vue"),
+      },
+    ],
+  },
+  {
+    path: "/merchant/login",
+    name: "merchant-login",
+    meta: {
+      title: "商家登录",
+    },
+    component: () => import("@/views/merchant/Login.vue"),
+  },
+  {
+    path: "/merchant/onboarding",
+    name: "merchant-onboarding",
+    meta: {
+      title: "商家入驻",
+    },
+    component: () => import("@/views/merchant/Onboarding.vue"),
+  },
+  {
+    path: "/merchant/config",
+    name: "merchant-config",
+    meta: {
+      title: "商家配置",
+    },
+    component: () => import("@/views/merchant/Config.vue"),
   },
   // 测试页面
   {

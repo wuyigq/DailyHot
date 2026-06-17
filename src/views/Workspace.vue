@@ -1,735 +1,202 @@
 <template>
-  <div class="workspace">
-    <section class="hero">
-      <div>
-        <n-tag type="success" round>Phase 1 MVP</n-tag>
-        <h1>个人热点雷达</h1>
+  <div class="workspace-page">
+    <section class="workspace-hero">
+      <div class="hero-copy">
+        <n-tag round type="error" size="small">ToB Web/PWA MVP</n-tag>
+        <h1>行业热点工作台</h1>
         <p>
-          按关键词和类型筛选全网热点，选择一条话题后生成可编辑的发布草稿。
-          当前阶段优先跑通“看热点 → 生成 → 复制/分享”的手机可用闭环。
+          先跑通商家内容闭环：筛行业热点、看来源和风险、生成草稿、做发布前检查。
         </p>
       </div>
-      <n-space>
-        <n-button secondary strong @click="loadFeed(true)" :loading="feedLoading">
-          拉取最新
+      <div class="hero-actions">
+        <n-button secondary strong :loading="feedLoading" @click="loadFeed(true)">
+          拉取最新热点
         </n-button>
-        <n-button type="primary" strong @click="savePreferences" :loading="saving">
-          保存设置
+        <n-button type="primary" strong :loading="savingSetup" @click="saveSetup">
+          保存行业配置
         </n-button>
-      </n-space>
+      </div>
     </section>
 
-    <n-grid cols="2 720:5 1100:10" :x-gap="16" :y-gap="16" class="overview-grid">
-      <n-grid-item>
-        <n-card class="metric-card">
-          <n-statistic label="草稿数" :value="overview.draftCount || 0" />
-        </n-card>
-      </n-grid-item>
-      <n-grid-item>
-        <n-card class="metric-card">
-          <n-statistic label="发布记录" :value="overview.publishCount || 0" />
-        </n-card>
-      </n-grid-item>
-      <n-grid-item>
-        <n-card class="metric-card">
-          <n-statistic label="待发布" :value="overview.pendingScheduleCount || 0" />
-        </n-card>
-      </n-grid-item>
-      <n-grid-item>
-        <n-card class="metric-card">
-          <n-statistic label="总曝光" :value="overview.totals?.views || 0" />
-        </n-card>
-      </n-grid-item>
-      <n-grid-item>
-        <n-card class="metric-card">
-          <n-statistic label="线索数" :value="overview.totals?.leads || 0" />
-        </n-card>
-      </n-grid-item>
-      <n-grid-item>
-        <n-card class="metric-card">
-          <n-statistic label="AI 生成" :value="overview.generation?.aiCount || 0" />
-        </n-card>
-      </n-grid-item>
-      <n-grid-item>
-        <n-card class="metric-card">
-          <n-statistic label="模板回退" :value="overview.generation?.templateCount || 0" />
-        </n-card>
-      </n-grid-item>
-      <n-grid-item>
-        <n-card class="metric-card">
-          <n-statistic label="平均耗时(ms)" :value="overview.generation?.averageLatencyMs || 0" />
-        </n-card>
-      </n-grid-item>
-      <n-grid-item>
-        <n-card class="metric-card">
-          <n-statistic label="估算 Tokens" :value="overview.generation?.totalTokens || 0" />
+    <n-grid cols="1 760:4" :x-gap="14" :y-gap="14" class="metric-grid">
+      <n-grid-item v-for="item in metricCards" :key="item.label">
+        <n-card class="metric-card" size="small">
+          <n-statistic :label="item.label" :value="item.value" />
         </n-card>
       </n-grid-item>
     </n-grid>
 
-    <n-card class="panel account-panel">
-      <template #header>
-        <div class="card-header">
-          <span>当前用户</span>
-          <n-text :depth="3">{{ currentUser.id || "未登录" }}</n-text>
-        </div>
-      </template>
-      <n-grid cols="1 760:4" :x-gap="12" :y-gap="12">
-        <n-grid-item>
-          <n-input v-model:value="loginForm.email" placeholder="邮箱，例如 creator@example.com" />
-        </n-grid-item>
-        <n-grid-item>
-          <n-input v-model:value="loginForm.name" placeholder="昵称，例如 篮球观察员" />
-        </n-grid-item>
-        <n-grid-item>
-          <n-button type="primary" block :loading="loginLoading" @click="login">
-            登录 / 创建本地用户
-          </n-button>
-        </n-grid-item>
-        <n-grid-item>
-          <n-button block secondary @click="useDefaultUser">
-            使用默认用户
-          </n-button>
-        </n-grid-item>
-      </n-grid>
-      <n-alert class="account-tip" type="info" :show-icon="false">
-        本阶段是本地轻量登录：用邮箱生成稳定用户 ID，所有订阅、草稿、发布记录会按用户隔离。
-      </n-alert>
-    </n-card>
-
     <n-grid cols="1 980:3" :x-gap="20" :y-gap="20">
       <n-grid-item>
-        <n-card title="订阅设置" class="panel">
-          <n-form label-placement="top">
-            <n-form-item label="关键词">
+        <n-card class="setup-panel">
+          <template #header>
+            <div class="panel-header">
+              <span>商家配置</span>
+              <n-text :depth="3">{{ currentUser.name || currentUser.id || "本地默认用户" }}</n-text>
+            </div>
+          </template>
+
+          <n-form label-placement="top" class="setup-form">
+            <n-form-item label="工作台身份">
+              <n-grid cols="1 560:2" :x-gap="10" :y-gap="10">
+                <n-grid-item>
+                  <n-input v-model:value="loginForm.email" placeholder="merchant@example.com" />
+                </n-grid-item>
+                <n-grid-item>
+                  <n-input v-model:value="loginForm.name" placeholder="商家 / 运营名称" />
+                </n-grid-item>
+              </n-grid>
+              <n-space class="identity-actions">
+                <n-button size="small" secondary :loading="loginLoading" @click="login">
+                  切换身份
+                </n-button>
+                <n-button size="small" quaternary @click="useDefaultUser">
+                  使用本地默认用户
+                </n-button>
+              </n-space>
+            </n-form-item>
+
+            <n-form-item label="行业预设">
+              <n-radio-group v-model:value="selectedPresetId">
+                <n-space vertical>
+                  <n-radio
+                    v-for="preset in industryPresets"
+                    :key="preset.id"
+                    :value="preset.id"
+                    :label="preset.label"
+                  />
+                </n-space>
+              </n-radio-group>
+              <n-button size="small" secondary class="preset-action" @click="applyIndustryPreset">
+                应用到当前配置
+              </n-button>
+            </n-form-item>
+
+            <n-form-item label="门店城市 / 商圈关键词">
+              <n-input v-model:value="localFocus.city" placeholder="例如：上海 徐汇 美罗城" />
+            </n-form-item>
+
+            <n-form-item label="本期活动 / 转化目标">
+              <n-input
+                v-model:value="localFocus.goal"
+                type="textarea"
+                :autosize="{ minRows: 2, maxRows: 4 }"
+                placeholder="例如：暑期团购、周末到店、暑期课程招生"
+              />
+            </n-form-item>
+
+            <n-form-item label="热点关键词">
               <n-dynamic-tags v-model:value="preferences.keywords" />
             </n-form-item>
-            <n-form-item label="类型">
+
+            <n-form-item label="关注维度">
               <n-checkbox-group v-model:value="preferences.categories">
-                <n-space>
+                <n-space wrap>
                   <n-checkbox
                     v-for="item in categoryOptions"
                     :key="item"
-                    :value="item"
                     :label="item"
+                    :value="item"
                   />
                 </n-space>
               </n-checkbox-group>
             </n-form-item>
+
             <n-form-item label="排除词">
               <n-dynamic-tags v-model:value="preferences.excludeWords" />
             </n-form-item>
+
             <n-form-item label="热点来源">
               <n-checkbox-group v-model:value="preferences.sources">
-                <n-space>
+                <n-space wrap>
                   <n-checkbox
-                    v-for="item in sourceOptions"
-                    :key="item.name"
-                    :value="item.name"
-                    :label="item.label"
+                    v-for="source in sourceOptions"
+                    :key="source.value"
+                    :label="source.label"
+                    :value="source.value"
                   />
                 </n-space>
               </n-checkbox-group>
             </n-form-item>
-            <n-form-item label="默认语气">
-              <n-radio-group v-model:value="preferences.tone">
-                <n-space>
+
+            <n-form-item label="品牌表达">
+              <n-radio-group v-model:value="draftOptions.tone">
+                <n-space wrap>
                   <n-radio-button value="balanced">克制理性</n-radio-button>
+                  <n-radio-button value="professional">专业可信</n-radio-button>
+                  <n-radio-button value="casual">轻松好懂</n-radio-button>
                   <n-radio-button value="sharp">观点鲜明</n-radio-button>
-                  <n-radio-button value="casual">轻松口语</n-radio-button>
-                  <n-radio-button value="professional">专业分析</n-radio-button>
                 </n-space>
               </n-radio-group>
             </n-form-item>
-          </n-form>
-        </n-card>
-        <n-card title="人设与观点库" class="panel persona-panel">
-          <n-form label-placement="top">
-            <n-form-item label="显示名称">
-              <n-input v-model:value="persona.displayName" placeholder="例如：篮球观察员" />
-            </n-form-item>
-            <n-form-item label="身份定位">
+
+            <n-form-item label="发布身份说明">
               <n-input
                 v-model:value="persona.identity"
                 type="textarea"
                 :autosize="{ minRows: 2, maxRows: 4 }"
+                placeholder="例如：本地连锁餐饮运营，关注门店到店转化和城市生活方式"
               />
             </n-form-item>
-            <n-form-item label="常用观点">
-              <n-dynamic-tags v-model:value="persona.viewpoints" />
-            </n-form-item>
-            <n-form-item label="禁用表达">
-              <n-dynamic-tags v-model:value="persona.forbiddenWords" />
-            </n-form-item>
+
             <n-form-item label="表达边界">
               <n-dynamic-tags v-model:value="persona.boundaries" />
             </n-form-item>
-            <n-button block secondary strong :loading="personaSaving" @click="savePersona">
-              保存人设
-            </n-button>
           </n-form>
         </n-card>
       </n-grid-item>
 
       <n-grid-item :span="2">
-        <n-card class="panel">
-          <template #header>
-            <div class="card-header">
-              <span>我的热点流</span>
-              <n-text :depth="3">{{ feed.length }} 条匹配</n-text>
-            </div>
-          </template>
-          <n-alert v-if="feedError" type="warning" :show-icon="false">
-            {{ feedError }}
-          </n-alert>
-          <n-spin :show="feedLoading">
-            <div v-if="feed.length" class="topic-list">
-              <article
-                v-for="topic in feed"
-                :key="`${topic.source}-${topic.id}-${topic.title}`"
-                class="topic"
-                :class="{ active: selectedTopic?.title === topic.title }"
-                @click="selectTopic(topic)"
-              >
-                <div class="topic-main">
-                  <div class="topic-title">{{ topic.title }}</div>
-                  <div class="topic-meta">
-                    <n-tag size="small" round>{{ topic.sourceTitle }}</n-tag>
-                    <n-tag size="small" :type="riskType(topic.riskLevel)" round>
-                      {{ riskLabel(topic.riskLevel) }}
-                    </n-tag>
-                    <n-text :depth="3">匹配分 {{ topic.score }}</n-text>
-                  </div>
-                  <p v-if="topic.desc" class="topic-desc">{{ topic.desc }}</p>
-                  <n-space size="small" class="matches">
-                    <n-tag
-                      v-for="word in [...topic.matchedKeywords, ...topic.matchedCategories]"
-                      :key="word"
-                      size="small"
-                      type="info"
-                      round
-                    >
-                      {{ word }}
-                    </n-tag>
-                  </n-space>
-                </div>
-                <n-button text type="primary" @click.stop="openTopic(topic)">
-                  来源
-                </n-button>
-              </article>
-            </div>
-            <n-empty v-else description="暂无匹配热点，调整关键词或点击拉取最新" />
-          </n-spin>
-        </n-card>
+        <n-grid cols="1 1200:2" :x-gap="20" :y-gap="20">
+          <n-grid-item>
+            <IndustryHotspotList
+              :topics="feed"
+              :selected-topic-id="selectedTopic?.id"
+              :loading="feedLoading"
+              :updated-at="feedUpdatedAt"
+              @refresh="loadFeed(true)"
+              @select="selectTopic"
+              @open-source="openTopic"
+            />
+          </n-grid-item>
+
+          <n-grid-item>
+            <HotspotGeneratePanel
+              :topic="selectedTopic"
+              :persona="persona"
+              :goal="localFocus.goal"
+              :platform="draftOptions.platform"
+              :tone="draftOptions.tone"
+              :generating="generating"
+              @update:platform="draftOptions.platform = $event"
+              @update:tone="draftOptions.tone = $event"
+              @generate="generateDraft"
+              @open-source="openTopic"
+            />
+          </n-grid-item>
+        </n-grid>
       </n-grid-item>
     </n-grid>
 
-    <n-grid cols="1 900:2" :x-gap="20" :y-gap="20" class="bottom-grid">
-      <n-grid-item>
-        <n-card title="生成草稿" class="panel">
-          <n-empty v-if="!selectedTopic" description="先从热点流选择一条话题" />
-          <template v-else>
-            <n-alert type="info" :show-icon="false">
-              已选择：{{ selectedTopic.title }}
-            </n-alert>
-            <div class="topic-detail">
-              <n-space size="small" class="topic-meta">
-                <n-tag size="small" round>
-                  {{ selectedTopic.relatedSources?.length || 1 }} 个来源
-                </n-tag>
-                <n-tag size="small" :type="riskType(selectedTopic.riskLevel)" round>
-                  {{ riskLabel(selectedTopic.riskLevel) }}
-                </n-tag>
-                <n-text v-if="selectedTopic.firstSeenAt" :depth="3">
-                  首见：{{ formatDate(selectedTopic.firstSeenAt) }}
-                </n-text>
-                <n-text v-if="selectedTopic.latestSeenAt" :depth="3">
-                  最新：{{ formatDate(selectedTopic.latestSeenAt) }}
-                </n-text>
-              </n-space>
-              <p v-if="selectedTopic.desc">{{ selectedTopic.desc }}</p>
-              <n-space size="small" class="source-links">
-                <n-button
-                  v-for="source in selectedTopic.relatedSources || [selectedTopic]"
-                  :key="`${source.source}-${source.url}`"
-                  size="tiny"
-                  secondary
-                  @click="openTopic(source)"
-                >
-                  {{ source.sourceTitle || source.source }}
-                </n-button>
-              </n-space>
-            </div>
-            <n-form label-placement="top" class="generate-form">
-              <n-form-item label="平台模板">
-                <n-radio-group v-model:value="draftOptions.platform">
-                  <n-space>
-                    <n-radio-button value="weibo">微博短评</n-radio-button>
-                    <n-radio-button value="xiaohongshu">小红书笔记</n-radio-button>
-                    <n-radio-button value="article">公众号开头</n-radio-button>
-                    <n-radio-button value="moments">朋友圈动态</n-radio-button>
-                    <n-radio-button value="video">视频口播</n-radio-button>
-                  </n-space>
-                </n-radio-group>
-              </n-form-item>
-              <n-form-item label="语气">
-                <n-radio-group v-model:value="draftOptions.tone">
-                  <n-space>
-                    <n-radio-button value="balanced">克制理性</n-radio-button>
-                    <n-radio-button value="sharp">观点鲜明</n-radio-button>
-                    <n-radio-button value="casual">轻松口语</n-radio-button>
-                    <n-radio-button value="professional">专业分析</n-radio-button>
-                  </n-space>
-                </n-radio-group>
-              </n-form-item>
-            </n-form>
-            <n-button
-              type="primary"
-              strong
-              block
-              :loading="generating"
-              @click="generateDraft"
-            >
-              生成并保存草稿
-            </n-button>
-          </template>
-        </n-card>
-      </n-grid-item>
-
-      <n-grid-item>
-        <n-card class="panel">
-          <template #header>
-            <div class="card-header">
-              <span>草稿箱</span>
-              <n-button size="small" secondary @click="loadDrafts">刷新</n-button>
-            </div>
-          </template>
-          <n-grid cols="1 720:3" :x-gap="8" :y-gap="8" class="draft-filters">
-            <n-grid-item>
-              <n-select v-model:value="draftFilters.platform" :options="draftPlatformFilterOptions" />
-            </n-grid-item>
-            <n-grid-item>
-              <n-select v-model:value="draftFilters.reviewStatus" :options="draftReviewFilterOptions" />
-            </n-grid-item>
-            <n-grid-item>
-              <n-select v-model:value="draftFilters.riskLevel" :options="draftRiskFilterOptions" />
-            </n-grid-item>
-          </n-grid>
-          <div v-if="filteredDrafts.length" class="draft-list">
-            <article v-for="draft in filteredDrafts" :key="draft.id" class="draft">
-              <div class="draft-meta">
-                <n-tag size="small" round>{{ platformLabel(draft.platform) }}</n-tag>
-                <n-tag size="small" round :type="generationType(draft.generationMode)">
-                  {{ generationLabel(draft.generationMode) }}
-                </n-tag>
-                <n-text :depth="3">{{ formatDate(draft.createdAt) }}</n-text>
-              </div>
-              <h3>{{ draft.topic.title }}</h3>
-              <div class="review-row">
-                <n-tag size="small" :type="reviewType(draft.reviewStatus)">
-                  {{ reviewLabel(draft.reviewStatus) }}
-                </n-tag>
-                <n-space size="small">
-                  <n-button size="tiny" secondary @click="updateReview(draft, 'reviewing')">
-                    送审
-                  </n-button>
-                  <n-button size="tiny" type="success" secondary @click="updateReview(draft, 'approved')">
-                    通过
-                  </n-button>
-                  <n-button size="tiny" type="error" secondary @click="updateReview(draft, 'rejected')">
-                    驳回
-                  </n-button>
-                </n-space>
-              </div>
-              <n-input
-                v-model:value="draft.content"
-                type="textarea"
-                :autosize="{ minRows: 5, maxRows: 12 }"
-              />
-              <n-select
-                class="draft-account-select"
-                size="small"
-                :value="selectedAccountIdForDraft(draft)"
-                :options="accountOptionsForDraft(draft)"
-                :placeholder="`${platformLabel(draft.platform)}发布账号`"
-                @update:value="setSelectedAccount(draft, $event)"
-              />
-              <n-space justify="end" class="draft-actions">
-                <n-button size="small" secondary @click="saveDraftContent(draft)">
-                  保存版本
-                </n-button>
-                <n-button size="small" secondary @click="loadDraftVersions(draft)">
-                  历史版本
-                </n-button>
-                <n-button size="small" secondary @click="checkDraft(draft)">
-                  发布检查
-                </n-button>
-                <n-button size="small" secondary :disabled="isPublishBlocked(draft)" @click="loadPublishPackage(draft)">
-                  发布助手
-                </n-button>
-                <n-button size="small" secondary :disabled="isPublishBlocked(draft)" @click="schedulePublish(draft)">
-                  加入计划
-                </n-button>
-                <n-button size="small" secondary @click="copyDraft(draft.content)">
-                  复制
-                </n-button>
-                <n-button size="small" type="primary" secondary @click="shareDraft(draft.content)">
-                  手机分享
-                </n-button>
-                <n-button size="small" type="success" secondary :disabled="isPublishBlocked(draft)" @click="recordPublish(draft)">
-                  记录发布
-                </n-button>
-                <n-button size="small" type="error" secondary @click="archiveDraft(draft)">
-                  归档
-                </n-button>
-              </n-space>
-              <n-alert
-                v-if="isPublishBlocked(draft)"
-                class="check-result"
-                type="warning"
-                :show-icon="false"
-              >
-                高风险草稿必须审核通过后才能进入发布流程。
-              </n-alert>
-              <n-alert
-                v-if="checkResults[draft.id]"
-                class="check-result"
-                :type="checkResults[draft.id].passed ? 'success' : 'warning'"
-                :show-icon="false"
-              >
-                <div class="check-title">
-                  {{ checkResults[draft.id].passed ? "检查通过" : "需要处理后再发布" }}
-                  <n-text :depth="3">
-                    {{ checkResults[draft.id].length }} / {{ checkResults[draft.id].limit }} 字
-                  </n-text>
-                </div>
-                <ul>
-                  <li v-for="issue in checkResults[draft.id].issues" :key="issue.message">
-                    [{{ issue.level }}] {{ issue.message }}
-                  </li>
-                </ul>
-              </n-alert>
-              <n-card
-                v-if="publishPackages[draft.id]"
-                class="publish-package"
-                size="small"
-                embedded
-              >
-                <template #header>
-                  <div class="card-header">
-                    <span>{{ publishPackages[draft.id].platformName }}发布包</span>
-                    <n-tag size="small" round>
-                      {{ publishPackages[draft.id].copyText.length }} 字
-                    </n-tag>
-                  </div>
-                </template>
-                <n-space vertical>
-                  <n-input
-                    :value="publishPackages[draft.id].copyText"
-                    type="textarea"
-                    readonly
-                    :autosize="{ minRows: 4, maxRows: 8 }"
-                  />
-                  <div class="tag-row">
-                    <n-tag
-                      v-for="tag in publishPackages[draft.id].hashtags"
-                      :key="tag"
-                      size="small"
-                      round
-                    >
-                      #{{ tag }}
-                    </n-tag>
-                  </div>
-                  <ul class="package-checklist">
-                    <li v-for="item in publishPackages[draft.id].checklist" :key="item">
-                      {{ item }}
-                    </li>
-                  </ul>
-                  <div
-                    v-if="publishPackages[draft.id].mediaSuggestion"
-                    class="media-suggestion"
-                  >
-                    <div class="media-title">
-                      <strong>封面/配图建议</strong>
-                      <n-tag size="small" round>
-                        {{ publishPackages[draft.id].mediaSuggestion.size }}
-                      </n-tag>
-                    </div>
-                    <p>
-                      封面标题：{{ publishPackages[draft.id].mediaSuggestion.coverTitle }}
-                    </p>
-                    <n-input
-                      :value="publishPackages[draft.id].mediaSuggestion.imagePrompt"
-                      type="textarea"
-                      readonly
-                      :autosize="{ minRows: 3, maxRows: 6 }"
-                    />
-                    <ul class="package-checklist">
-                      <li
-                        v-for="tip in publishPackages[draft.id].mediaSuggestion.styleTips"
-                        :key="tip"
-                      >
-                        {{ tip }}
-                      </li>
-                    </ul>
-                    <n-alert type="warning" :show-icon="false">
-                      {{ publishPackages[draft.id].mediaSuggestion.copyrightNotice }}
-                    </n-alert>
-                  </div>
-                  <n-space justify="end" class="draft-actions">
-                    <n-button size="small" secondary @click="copyDraft(publishPackages[draft.id].copyText)">
-                      复制发布包
-                    </n-button>
-                    <n-button size="small" secondary @click="downloadPackage(publishPackages[draft.id])">
-                      下载文案
-                    </n-button>
-                    <n-button size="small" type="primary" secondary @click="sharePackage(publishPackages[draft.id])">
-                      手机分享
-                    </n-button>
-                    <n-button size="small" type="success" secondary @click="openPublishTarget(publishPackages[draft.id])">
-                      打开平台
-                    </n-button>
-                  </n-space>
-                </n-space>
-              </n-card>
-              <n-card
-                v-if="draftVersions[draft.id]?.length"
-                class="draft-versions"
-                size="small"
-                embedded
-              >
-                <template #header>
-                  <div class="card-header">
-                    <span>版本历史</span>
-                    <n-tag size="small" round>{{ draftVersions[draft.id].length }} 个版本</n-tag>
-                  </div>
-                </template>
-                <n-timeline>
-                  <n-timeline-item
-                    v-for="version in draftVersions[draft.id]"
-                    :key="version.id"
-                    type="info"
-                    :title="version.note"
-                    :time="formatDate(version.createdAt)"
-                  >
-                    <p class="version-preview">{{ version.content }}</p>
-                    <n-space justify="end">
-                      <n-button size="tiny" secondary @click="restoreDraftVersion(draft, version)">
-                        恢复此版本
-                      </n-button>
-                    </n-space>
-                  </n-timeline-item>
-                </n-timeline>
-              </n-card>
-            </article>
-          </div>
-          <n-empty v-else description="没有符合筛选条件的草稿" />
-        </n-card>
-      </n-grid-item>
-    </n-grid>
-
-    <n-card class="panel insights-panel">
-      <template #header>
-        <div class="card-header">
-          <span>内容复盘建议</span>
-          <n-button size="small" secondary @click="loadInsights">刷新</n-button>
-        </div>
-      </template>
-      <n-grid cols="1 760:4" :x-gap="12" :y-gap="12">
-        <n-grid-item>
-          <n-statistic label="待发布计划" :value="insights.pendingScheduleCount || 0" />
-        </n-grid-item>
-        <n-grid-item>
-          <n-statistic label="未回填记录" :value="insights.unmeasuredRecordCount || 0" />
-        </n-grid-item>
-        <n-grid-item>
-          <n-statistic label="高风险草稿" :value="insights.highRiskDraftCount || 0" />
-        </n-grid-item>
-        <n-grid-item>
-          <n-statistic label="平台样本" :value="insights.rankedPlatforms?.length || 0" />
-        </n-grid-item>
-      </n-grid>
-      <ul class="insight-list">
-        <li v-for="item in insights.suggestions" :key="item">{{ item }}</li>
-      </ul>
-    </n-card>
-
-    <n-card class="panel accounts-panel">
-      <template #header>
-        <div class="card-header">
-          <span>平台账号</span>
-          <n-button size="small" secondary @click="loadPlatformAccounts">刷新</n-button>
-        </div>
-      </template>
-      <n-grid cols="1 760:4" :x-gap="12" :y-gap="12">
-        <n-grid-item>
-          <n-select
-            v-model:value="accountForm.platform"
-            :options="platformOptions"
-            placeholder="平台"
-          />
-        </n-grid-item>
-        <n-grid-item>
-          <n-input v-model:value="accountForm.displayName" placeholder="账号昵称，例如 体育观察号" />
-        </n-grid-item>
-        <n-grid-item>
-          <n-input v-model:value="accountForm.profileUrl" placeholder="主页链接，可选" />
-        </n-grid-item>
-        <n-grid-item>
-          <n-space vertical>
-            <n-button type="primary" block secondary @click="savePlatformAccount">
-              {{ editingAccountId ? "保存账号" : "添加账号" }}
-            </n-button>
-            <n-button v-if="editingAccountId" block secondary @click="resetAccountForm">
-              取消编辑
-            </n-button>
-          </n-space>
-        </n-grid-item>
-      </n-grid>
-      <div v-if="platformAccounts.length" class="account-list">
-        <div
-          v-for="account in platformAccounts"
-          :key="account.id"
-          class="account-item"
-          :class="{ inactive: account.status === 'inactive' }"
-        >
-          <div>
-            <n-space align="center" size="small">
-              <n-tag size="small" round :type="account.platform === accountForm.platform ? 'success' : 'default'">
-                {{ platformLabel(account.platform) }}
-              </n-tag>
-              <strong>{{ account.displayName }}</strong>
-              <n-tag size="small" round :type="account.status === 'inactive' ? 'warning' : 'success'">
-                {{ account.status === "inactive" ? "已停用" : "启用中" }}
-              </n-tag>
-            </n-space>
-            <p v-if="account.profileUrl">{{ account.profileUrl }}</p>
-            <p v-if="account.note">{{ account.note }}</p>
-          </div>
-          <n-space size="small">
-            <n-button size="tiny" secondary @click="editPlatformAccount(account)">
-              编辑
-            </n-button>
-            <n-button size="tiny" secondary @click="togglePlatformAccountStatus(account)">
-              {{ account.status === "inactive" ? "恢复" : "停用" }}
-            </n-button>
-            <n-button size="tiny" type="error" secondary @click="deletePlatformAccount(account)">
-              删除
-            </n-button>
-          </n-space>
-        </div>
-      </div>
-      <n-alert v-else class="account-tip" type="info" :show-icon="false">
-        本地只保存账号昵称、平台和主页链接，不保存密码、Cookie 或平台 token。
-      </n-alert>
-    </n-card>
-
-    <n-card class="panel schedules-panel">
-      <template #header>
-        <div class="card-header">
-          <span>发布计划队列</span>
-          <n-button size="small" secondary @click="loadPublishSchedules">刷新</n-button>
-        </div>
-      </template>
-      <n-grid cols="1 480:3" :x-gap="8" :y-gap="8" class="schedule-filters">
-        <n-grid-item>
-          <n-select v-model:value="scheduleFilters.status" :options="scheduleStatusFilterOptions" />
-        </n-grid-item>
-      </n-grid>
-      <n-timeline v-if="filteredPublishSchedules.length">
-        <n-timeline-item
-          v-for="schedule in filteredPublishSchedules"
-          :key="schedule.id"
-          :type="scheduleType(schedule.status)"
-          :title="`${platformLabel(schedule.platform)} · ${schedule.accountName || '未指定账号'} · ${scheduleLabel(schedule.status)}`"
-          :time="formatDate(schedule.scheduledAt)"
-        >
-          <div class="schedule-content">
-            <n-tag v-if="isScheduleOverdue(schedule)" size="small" type="warning" round>
-              已到点/逾期
-            </n-tag>
-            <p>{{ schedule.note || "等待执行发布计划" }}</p>
-            <n-space class="record-actions" justify="end">
-              <n-button size="small" secondary @click="updateScheduleStatus(schedule, 'ready')">
-                标记待发布
-              </n-button>
-              <n-button size="small" type="success" secondary @click="updateScheduleStatus(schedule, 'published')">
-                已发布
-              </n-button>
-              <n-button size="small" type="warning" secondary @click="updateScheduleStatus(schedule, 'skipped')">
-                跳过
-              </n-button>
-            </n-space>
-          </div>
-        </n-timeline-item>
-      </n-timeline>
-      <n-empty v-else description="还没有发布计划" />
-    </n-card>
-
-    <n-card class="panel records-panel">
-      <template #header>
-        <div class="card-header">
-          <span>半自动发布记录</span>
-          <n-button size="small" secondary @click="loadPublishRecords">刷新</n-button>
-        </div>
-      </template>
-      <n-timeline v-if="publishRecords.length">
-        <n-timeline-item
-          v-for="record in publishRecords"
-          :key="record.id"
-          :type="record.status === 'failed' ? 'error' : 'success'"
-          :title="`${platformLabel(record.platform)} · ${record.accountName || '未指定账号'} · ${record.status}`"
-          :time="formatDate(record.createdAt)"
-        >
-          <div class="record-content">
-            <p>{{ record.note || record.publishUrl || "已记录半自动发布动作" }}</p>
-            <n-grid cols="2 640:5" :x-gap="8" :y-gap="8">
-              <n-grid-item>
-                <n-input-number v-model:value="metricForms[record.id].views" size="small" placeholder="曝光" />
-              </n-grid-item>
-              <n-grid-item>
-                <n-input-number v-model:value="metricForms[record.id].likes" size="small" placeholder="点赞" />
-              </n-grid-item>
-              <n-grid-item>
-                <n-input-number v-model:value="metricForms[record.id].comments" size="small" placeholder="评论" />
-              </n-grid-item>
-              <n-grid-item>
-                <n-input-number v-model:value="metricForms[record.id].shares" size="small" placeholder="转发" />
-              </n-grid-item>
-              <n-grid-item>
-                <n-input-number v-model:value="metricForms[record.id].leads" size="small" placeholder="线索" />
-              </n-grid-item>
-            </n-grid>
-            <n-space class="record-actions" justify="end">
-              <n-button size="small" secondary @click="saveMetrics(record)">
-                保存指标
-              </n-button>
-            </n-space>
-          </div>
-        </n-timeline-item>
-      </n-timeline>
-      <n-empty v-else description="还没有发布记录" />
-    </n-card>
-
-    <n-card class="panel audit-panel">
-      <template #header>
-        <div class="card-header">
-          <span>合规审计日志</span>
-          <n-button size="small" secondary @click="loadAuditLogs">刷新</n-button>
-        </div>
-      </template>
-      <n-timeline v-if="auditLogs.length">
-        <n-timeline-item
-          v-for="log in auditLogs"
-          :key="log.id"
-          type="info"
-          :title="log.action"
-          :content="`${log.targetType}: ${log.targetId}`"
-          :time="formatDate(log.createdAt)"
-        />
-      </n-timeline>
-      <n-empty v-else description="还没有审计记录" />
-    </n-card>
+    <DraftBox
+      class="draft-section"
+      :drafts="filteredDrafts"
+      :active-draft-id="activeDraftId"
+      :check-results="checkResults"
+      :publish-packages="publishPackages"
+      :loading="draftLoading"
+      :filters="draftFilters"
+      @update:filters="updateDraftFilters"
+      @select="setActiveDraft"
+      @update-content="updateDraftContent"
+      @save="saveDraftContent"
+      @review="updateReview"
+      @check="checkDraft"
+      @publish-package="loadPublishPackage"
+      @copy="copyDraft"
+      @archive="archiveDraft"
+      @open-deeplink="openPublishTarget"
+    />
   </div>
 </template>
 
@@ -737,83 +204,83 @@
 import {
   archiveWorkspaceDraft,
   checkWorkspaceDraft,
-  createWorkspacePlatformAccount,
-  createWorkspacePublishRecord,
-  createWorkspacePublishSchedule,
-  deleteWorkspacePlatformAccount,
   generateWorkspaceDraft,
-  getWorkspaceAuditLogs,
+  getWorkspaceDrafts,
+  getWorkspaceFeed,
   getWorkspaceMe,
   getWorkspaceOverview,
   getWorkspacePersona,
-  getWorkspacePlatformAccounts,
-  getWorkspacePublishPackage,
-  getWorkspacePublishRecords,
-  getWorkspacePublishSchedules,
-  getWorkspaceDrafts,
-  getWorkspaceDraftVersions,
-  getWorkspaceFeed,
-  getWorkspaceInsights,
   getWorkspacePreferences,
+  getWorkspacePublishPackage,
   loginWorkspace,
-  restoreWorkspaceDraftVersion,
-  saveWorkspacePersona,
   saveWorkspaceDraftContent,
+  saveWorkspacePersona,
   saveWorkspacePreferences,
   updateWorkspaceDraftReview,
-  updateWorkspacePlatformAccount,
-  updateWorkspacePublishMetrics,
-  updateWorkspacePublishSchedule,
 } from "@/api";
+import DraftBox from "@/components/workspace/DraftBox.vue";
+import HotspotGeneratePanel from "@/components/workspace/HotspotGeneratePanel.vue";
+import IndustryHotspotList from "@/components/workspace/IndustryHotspotList.vue";
 
-const categoryOptions = ["体育", "娱乐", "科技", "财经", "政治", "军事", "游戏", "社会"];
+const industryPresets = [
+  {
+    id: "catering",
+    label: "餐饮门店",
+    keywords: ["餐饮", "门店", "团购", "探店", "到店"],
+    categories: ["社会", "财经", "娱乐"],
+    identity: "本地餐饮商家运营，关注到店转化、套餐活动和城市生活热点",
+    goal: "周末到店、团购成交、节日活动预热",
+  },
+  {
+    id: "travel",
+    label: "本地文旅",
+    keywords: ["文旅", "景区", "出游", "演出", "周末"],
+    categories: ["社会", "娱乐", "财经"],
+    identity: "本地文旅品牌运营，关注节假日出游、城市活动和线下消费热度",
+    goal: "周末客流、活动预约、节庆营销",
+  },
+  {
+    id: "education",
+    label: "教育培训",
+    keywords: ["招生", "课程", "培训", "家长", "暑期班"],
+    categories: ["社会", "财经", "科技"],
+    identity: "教育培训机构内容运营，关注家长决策、课程报名和口碑传播",
+    goal: "暑期班招生、试听转化、家长咨询",
+  },
+  {
+    id: "wellness",
+    label: "美业健身",
+    keywords: ["健身", "美业", "会员", "门店", "优惠"],
+    categories: ["社会", "财经", "娱乐"],
+    identity: "本地美业健身门店运营，关注会员增长、到店复购和季节性活动",
+    goal: "拉新办卡、活动预约、老客复购",
+  },
+];
+
+const categoryOptions = ["社会", "财经", "科技", "娱乐", "体育"];
 const sourceOptions = [
-  { label: "微博", name: "weibo" },
-  { label: "知乎", name: "zhihu" },
-  { label: "哔哩哔哩", name: "bilibili" },
-  { label: "抖音", name: "douyin" },
-  { label: "今日头条", name: "toutiao" },
-  { label: "IT之家", name: "ithome" },
-  { label: "百度", name: "baidu" },
-  { label: "腾讯新闻", name: "qq-news" },
-  { label: "新浪新闻", name: "sina-news" },
-  { label: "澎湃新闻", name: "thepaper" },
-];
-const platformOptions = [
-  { label: "微博短评", value: "weibo" },
-  { label: "小红书笔记", value: "xiaohongshu" },
-  { label: "公众号开头", value: "article" },
-  { label: "朋友圈动态", value: "moments" },
-  { label: "视频口播", value: "video" },
-];
-const draftPlatformFilterOptions = [
-  { label: "全部平台", value: "all" },
-  ...platformOptions,
-];
-const draftReviewFilterOptions = [
-  { label: "全部审核状态", value: "all" },
-  { label: "草稿", value: "draft" },
-  { label: "审核中", value: "reviewing" },
-  { label: "已通过", value: "approved" },
-  { label: "已驳回", value: "rejected" },
-];
-const draftRiskFilterOptions = [
-  { label: "全部风险", value: "all" },
-  { label: "低风险", value: "low" },
-  { label: "需核实", value: "medium" },
-  { label: "高风险", value: "high" },
-];
-const scheduleStatusFilterOptions = [
-  { label: "待处理计划", value: "open" },
-  { label: "已到点/逾期", value: "overdue" },
-  { label: "全部计划", value: "all" },
-  { label: "未到点", value: "pending" },
-  { label: "待发布", value: "ready" },
-  { label: "已发布", value: "published" },
-  { label: "已跳过", value: "skipped" },
-  { label: "失败", value: "failed" },
+  { label: "微博", value: "weibo" },
+  { label: "知乎", value: "zhihu" },
+  { label: "B 站", value: "bilibili" },
+  { label: "抖音", value: "douyin" },
+  { label: "头条", value: "toutiao" },
+  { label: "IT之家", value: "ithome" },
+  { label: "百度", value: "baidu" },
+  { label: "腾讯新闻", value: "qq-news" },
+  { label: "新浪新闻", value: "sina-news" },
+  { label: "澎湃", value: "thepaper" },
 ];
 
+const currentUser = ref({});
+const loginForm = ref({
+  email: "merchant@example.com",
+  name: "本地商家工作台",
+});
+const selectedPresetId = ref(industryPresets[0].id);
+const localFocus = ref({
+  city: "",
+  goal: "",
+});
 const preferences = ref({
   keywords: [],
   categories: [],
@@ -821,110 +288,77 @@ const preferences = ref({
   sources: [],
   tone: "balanced",
 });
-const currentUser = ref({
-  id: "",
-  email: "",
-  name: "",
-});
-const loginForm = ref({
-  email: "",
-  name: "",
-});
 const persona = ref({
   displayName: "",
   identity: "",
-  voice: "balanced",
-  viewpoints: [],
-  forbiddenWords: [],
   boundaries: [],
 });
 const draftOptions = ref({
-  platform: "weibo",
+  platform: "xiaohongshu",
   tone: "balanced",
 });
 const draftFilters = ref({
   platform: "all",
+  risk: "all",
   reviewStatus: "all",
-  riskLevel: "all",
 });
-const scheduleFilters = ref({
-  status: "open",
-});
-const accountForm = ref({
-  platform: "weibo",
-  displayName: "",
-  profileUrl: "",
-  note: "",
-});
-const editingAccountId = ref("");
-const feed = ref([]);
-const drafts = ref([]);
-const publishRecords = ref([]);
-const publishSchedules = ref([]);
-const platformAccounts = ref([]);
-const auditLogs = ref([]);
 const overview = ref({
   draftCount: 0,
   publishCount: 0,
-  scheduleCount: 0,
   pendingScheduleCount: 0,
   totals: {
     views: 0,
-    likes: 0,
-    comments: 0,
-    shares: 0,
     leads: 0,
   },
-  generation: {
-    aiCount: 0,
-    templateCount: 0,
-    averageLatencyMs: 0,
-    totalTokens: 0,
-  },
 });
-const insights = ref({
-  rankedPlatforms: [],
-  bestRecord: null,
-  pendingScheduleCount: 0,
-  unmeasuredRecordCount: 0,
-  highRiskDraftCount: 0,
-  suggestions: [],
-});
-const metricForms = ref({});
+const feed = ref([]);
+const drafts = ref([]);
 const checkResults = ref({});
 const publishPackages = ref({});
-const draftVersions = ref({});
-const selectedAccountIds = ref({});
 const selectedTopic = ref(null);
-const loginLoading = ref(false);
-const saving = ref(false);
-const personaSaving = ref(false);
+const activeDraftId = ref("");
+const feedUpdatedAt = ref("");
 const feedLoading = ref(false);
+const draftLoading = ref(false);
 const generating = ref(false);
-const feedError = ref("");
-const filteredDrafts = computed(() => {
-  return drafts.value.filter((draft) => {
-    const platformMatched = draftFilters.value.platform === "all" || draft.platform === draftFilters.value.platform;
-    const reviewMatched =
-      draftFilters.value.reviewStatus === "all" || (draft.reviewStatus || "draft") === draftFilters.value.reviewStatus;
-    const riskMatched = draftFilters.value.riskLevel === "all" || draft.topic?.riskLevel === draftFilters.value.riskLevel;
-    return platformMatched && reviewMatched && riskMatched;
-  });
-});
-const filteredPublishSchedules = computed(() => {
-  return publishSchedules.value.filter((schedule) => {
-    if (scheduleFilters.value.status === "all") return true;
-    if (scheduleFilters.value.status === "open") return ["pending", "ready"].includes(schedule.status);
-    if (scheduleFilters.value.status === "overdue") return isScheduleOverdue(schedule);
-    return schedule.status === scheduleFilters.value.status;
-  });
-});
+const savingSetup = ref(false);
+const loginLoading = ref(false);
 
-const loadPreferences = async () => {
-  const res = await getWorkspacePreferences();
-  if (res.code === 200) {
-    preferences.value = res.data;
-    draftOptions.value.tone = res.data.tone;
+const metricCards = computed(() => [
+  { label: "热点候选", value: feed.value.length },
+  { label: "草稿数", value: overview.value.draftCount || 0 },
+  { label: "待发布", value: overview.value.pendingScheduleCount || 0 },
+  { label: "累计线索", value: overview.value.totals?.leads || 0 },
+]);
+
+const filteredDrafts = computed(() =>
+  drafts.value.filter((draft) => {
+    const platformMatched =
+      draftFilters.value.platform === "all" || draft.platform === draftFilters.value.platform;
+    const riskMatched =
+      draftFilters.value.risk === "all" || draft.topic?.riskLevel === draftFilters.value.risk;
+    const reviewMatched =
+      draftFilters.value.reviewStatus === "all" ||
+      (draft.reviewStatus || "draft") === draftFilters.value.reviewStatus;
+    return platformMatched && riskMatched && reviewMatched;
+  })
+);
+
+const applyIndustryPreset = () => {
+  const preset = industryPresets.find((item) => item.id === selectedPresetId.value);
+  if (!preset) return;
+  preferences.value.keywords = [...preset.keywords];
+  preferences.value.categories = [...preset.categories];
+  persona.value.identity = preset.identity;
+  localFocus.value.goal = preset.goal;
+  draftOptions.value.tone = "professional";
+};
+
+const hydrateLocalFocus = () => {
+  const keywordText = preferences.value.keywords.join(" ");
+  if (!localFocus.value.city) {
+    const cityMatch = keywordText.match(/北京|上海|广州|深圳|杭州|成都|重庆|苏州|南京|武汉|西安/);
+    if (cityMatch) localFocus.value.city = cityMatch[0];
   }
 };
 
@@ -932,34 +366,140 @@ const loadMe = async () => {
   const res = await getWorkspaceMe();
   if (res.code === 200) {
     currentUser.value = res.data;
-    loginForm.value.email = res.data.email || loginForm.value.email;
-    loginForm.value.name = res.data.name || loginForm.value.name;
+    if (!loginForm.value.email && res.data.email) loginForm.value.email = res.data.email;
+    if (!loginForm.value.name && res.data.name) loginForm.value.name = res.data.name;
+  }
+};
+
+const loadPreferences = async () => {
+  const res = await getWorkspacePreferences();
+  if (res.code === 200) {
+    preferences.value = res.data;
+    draftOptions.value.tone = res.data.tone || draftOptions.value.tone;
+    hydrateLocalFocus();
+  }
+};
+
+const loadPersona = async () => {
+  const res = await getWorkspacePersona();
+  if (res.code === 200) {
+    persona.value = {
+      displayName: res.data.displayName || "",
+      identity: res.data.identity || "",
+      boundaries: res.data.boundaries || [],
+    };
+  }
+};
+
+const loadOverview = async () => {
+  const res = await getWorkspaceOverview();
+  if (res.code === 200) overview.value = res.data;
+};
+
+const loadFeed = async (isNew = false) => {
+  feedLoading.value = true;
+  try {
+    const res = await getWorkspaceFeed({
+      cache: !isNew,
+      limit: 24,
+    });
+    if (res.code === 200) {
+      feed.value = res.data;
+      feedUpdatedAt.value = res.updateTime;
+      if (!selectedTopic.value && res.data[0]) {
+        selectedTopic.value = res.data[0];
+      } else if (selectedTopic.value) {
+        selectedTopic.value =
+          res.data.find((item) => item.id === selectedTopic.value.id) || res.data[0] || null;
+      }
+    }
+  } finally {
+    feedLoading.value = false;
+  }
+};
+
+const loadDrafts = async () => {
+  draftLoading.value = true;
+  try {
+    const res = await getWorkspaceDrafts();
+    if (res.code === 200) {
+      drafts.value = res.data;
+      if (!activeDraftId.value && res.data[0]) {
+        activeDraftId.value = res.data[0].id;
+      }
+    }
+  } finally {
+    draftLoading.value = false;
   }
 };
 
 const reloadWorkspace = async () => {
   await Promise.all([loadMe(), loadPreferences(), loadPersona()]);
-  await Promise.all([
-    loadFeed(false),
-    loadDrafts(),
-    loadPlatformAccounts(),
-    loadPublishRecords(),
-    loadPublishSchedules(),
-    loadOverview(),
-    loadInsights(),
-    loadAuditLogs(),
-  ]);
+  if (!preferences.value.keywords.length) applyIndustryPreset();
+  await Promise.all([loadOverview(), loadFeed(), loadDrafts()]);
+};
+
+const saveSetup = async () => {
+  savingSetup.value = true;
+  try {
+    const mergedKeywords = [
+      ...preferences.value.keywords,
+      ...localFocus.value.city.split(/\s+/),
+      ...localFocus.value.goal.split(/[、,，\s]+/),
+    ]
+      .map((item) => String(item).trim())
+      .filter(Boolean);
+
+    const nextPreferences = {
+      ...preferences.value,
+      keywords: [...new Set(mergedKeywords)],
+      tone: draftOptions.value.tone,
+    };
+
+    const nextPersona = {
+      ...persona.value,
+      displayName: persona.value.displayName || currentUser.value.name || "本地商家",
+      identity:
+        persona.value.identity ||
+        "本地商家内容运营，默认保留来源，优先服务线索转化与门店增长",
+      voice: draftOptions.value.tone,
+      viewpoints: [],
+      forbiddenWords: [],
+      boundaries: persona.value.boundaries || [],
+    };
+
+    const [prefRes, personaRes] = await Promise.all([
+      saveWorkspacePreferences(nextPreferences),
+      saveWorkspacePersona(nextPersona),
+    ]);
+
+    if (prefRes.code === 200) preferences.value = prefRes.data;
+    if (personaRes.code === 200) {
+      persona.value = {
+        displayName: personaRes.data.displayName || "",
+        identity: personaRes.data.identity || "",
+        boundaries: personaRes.data.boundaries || [],
+      };
+    }
+    $message.success("行业配置已保存");
+    await loadFeed(true);
+  } finally {
+    savingSetup.value = false;
+  }
 };
 
 const login = async () => {
-  if (!loginForm.value.email) return $message.warning("请输入邮箱");
+  if (!loginForm.value.email) {
+    $message.warning("请先填写工作台邮箱");
+    return;
+  }
   loginLoading.value = true;
   try {
     const res = await loginWorkspace(loginForm.value);
     if (res.code === 200) {
       localStorage.setItem("workspaceUserId", res.data.id);
       currentUser.value = res.data;
-      $message.success(`已登录：${res.data.name}`);
+      $message.success("工作台身份已切换");
       await reloadWorkspace();
     }
   } finally {
@@ -969,176 +509,9 @@ const login = async () => {
 
 const useDefaultUser = async () => {
   localStorage.removeItem("workspaceUserId");
-  loginForm.value = { email: "", name: "" };
-  $message.info("已切换到默认本地用户");
+  currentUser.value = {};
+  $message.info("已切换为本地默认用户");
   await reloadWorkspace();
-};
-
-const loadPersona = async () => {
-  const res = await getWorkspacePersona();
-  if (res.code === 200) persona.value = res.data;
-};
-
-const savePersona = async () => {
-  personaSaving.value = true;
-  try {
-    const res = await saveWorkspacePersona(persona.value);
-    if (res.code === 200) {
-      persona.value = res.data;
-      $message.success("人设已保存");
-    }
-  } finally {
-    personaSaving.value = false;
-  }
-};
-
-const savePreferences = async () => {
-  saving.value = true;
-  try {
-    const res = await saveWorkspacePreferences(preferences.value);
-    if (res.code === 200) {
-      $message.success("订阅设置已保存");
-      await loadFeed(false);
-    }
-  } finally {
-    saving.value = false;
-  }
-};
-
-const loadFeed = async (isNew = false) => {
-  feedLoading.value = true;
-  feedError.value = "";
-  try {
-    const res = await getWorkspaceFeed({ cache: !isNew, limit: 80 });
-    if (res.code === 200) {
-      feed.value = res.data;
-      selectedTopic.value = res.data[0] || null;
-    } else {
-      feedError.value = res.message || "热点流加载失败";
-    }
-  } catch (error) {
-    feedError.value = "热点流加载失败，请检查后端服务";
-  } finally {
-    feedLoading.value = false;
-  }
-};
-
-const loadDrafts = async () => {
-  const res = await getWorkspaceDrafts();
-  if (res.code === 200) drafts.value = res.data;
-};
-
-const loadPublishRecords = async () => {
-  const res = await getWorkspacePublishRecords();
-  if (res.code === 200) {
-    publishRecords.value = res.data;
-    metricForms.value = res.data.reduce((acc, record) => {
-      acc[record.id] = {
-        views: record.metrics?.views || 0,
-        likes: record.metrics?.likes || 0,
-        comments: record.metrics?.comments || 0,
-        shares: record.metrics?.shares || 0,
-        leads: record.metrics?.leads || 0,
-      };
-      return acc;
-    }, {});
-  }
-};
-
-const loadPlatformAccounts = async () => {
-  const res = await getWorkspacePlatformAccounts();
-  if (res.code === 200) platformAccounts.value = res.data;
-};
-
-const resetAccountForm = () => {
-  editingAccountId.value = "";
-  accountForm.value = {
-    platform: "weibo",
-    displayName: "",
-    profileUrl: "",
-    note: "",
-  };
-};
-
-const savePlatformAccount = async () => {
-  if (!accountForm.value.platform || !accountForm.value.displayName) {
-    return $message.warning("请选择平台并填写账号昵称");
-  }
-  const res = editingAccountId.value
-    ? await updateWorkspacePlatformAccount(editingAccountId.value, accountForm.value)
-    : await createWorkspacePlatformAccount(accountForm.value);
-  if (res.code === 200) {
-    if (editingAccountId.value) {
-      platformAccounts.value = platformAccounts.value.map((account) =>
-        account.id === res.data.id ? res.data : account
-      );
-      $message.success("平台账号已更新");
-    } else {
-      platformAccounts.value = [...platformAccounts.value, res.data];
-      $message.success("平台账号已添加");
-    }
-    resetAccountForm();
-    await loadAuditLogs();
-  }
-};
-
-const editPlatformAccount = (account) => {
-  editingAccountId.value = account.id;
-  accountForm.value = {
-    platform: account.platform,
-    displayName: account.displayName,
-    profileUrl: account.profileUrl || "",
-    note: account.note || "",
-  };
-};
-
-const togglePlatformAccountStatus = async (account) => {
-  const status = account.status === "inactive" ? "active" : "inactive";
-  const res = await updateWorkspacePlatformAccount(account.id, { status });
-  if (res.code === 200) {
-    platformAccounts.value = platformAccounts.value.map((item) => (item.id === account.id ? res.data : item));
-    if (status === "inactive") {
-      selectedAccountIds.value = Object.fromEntries(
-        Object.entries(selectedAccountIds.value).filter(([, accountId]) => accountId !== account.id)
-      );
-    }
-    $message.success(status === "inactive" ? "账号已停用" : "账号已恢复");
-    await loadAuditLogs();
-  }
-};
-
-const deletePlatformAccount = async (account) => {
-  if (!window.confirm(`确认删除账号「${account.displayName}」？历史发布记录会保留账号名称。`)) return;
-  const res = await deleteWorkspacePlatformAccount(account.id);
-  if (res.code === 200) {
-    platformAccounts.value = platformAccounts.value.filter((item) => item.id !== account.id);
-    selectedAccountIds.value = Object.fromEntries(
-      Object.entries(selectedAccountIds.value).filter(([, accountId]) => accountId !== account.id)
-    );
-    if (editingAccountId.value === account.id) resetAccountForm();
-    $message.success("平台账号已删除");
-    await loadAuditLogs();
-  }
-};
-
-const loadPublishSchedules = async () => {
-  const res = await getWorkspacePublishSchedules();
-  if (res.code === 200) publishSchedules.value = res.data;
-};
-
-const loadOverview = async () => {
-  const res = await getWorkspaceOverview();
-  if (res.code === 200) overview.value = res.data;
-};
-
-const loadInsights = async () => {
-  const res = await getWorkspaceInsights();
-  if (res.code === 200) insights.value = res.data;
-};
-
-const loadAuditLogs = async () => {
-  const res = await getWorkspaceAuditLogs();
-  if (res.code === 200) auditLogs.value = res.data;
 };
 
 const selectTopic = (topic) => {
@@ -1151,34 +524,60 @@ const openTopic = (topic) => {
 };
 
 const generateDraft = async () => {
-  if (!selectedTopic.value) return;
+  if (!selectedTopic.value) {
+    $message.warning("请先选择一个热点");
+    return;
+  }
   generating.value = true;
   try {
     const res = await generateWorkspaceDraft({
       topic: selectedTopic.value,
-      ...draftOptions.value,
+      platform: draftOptions.value.platform,
+      tone: draftOptions.value.tone,
     });
     if (res.code === 200) {
-      $message.success(`草稿已生成：${generationLabel(res.data.generationMode)}`);
       drafts.value = [res.data, ...drafts.value];
-      await Promise.all([loadOverview(), loadAuditLogs()]);
+      activeDraftId.value = res.data.id;
+      $message.success("草稿已生成并加入草稿箱");
+      await loadOverview();
     }
   } finally {
     generating.value = false;
   }
 };
 
-const copyDraft = async (content) => {
-  await navigator.clipboard.writeText(content);
-  $message.success("已复制到剪贴板");
+const setActiveDraft = (draftId) => {
+  activeDraftId.value = draftId;
 };
 
-const shareDraft = async (content) => {
-  if (navigator.share) {
-    await navigator.share({ text: content });
-  } else {
-    await copyDraft(content);
-    $message.info("当前浏览器不支持系统分享，已复制文案");
+const updateDraftFilters = (patch) => {
+  draftFilters.value = {
+    ...draftFilters.value,
+    ...patch,
+  };
+};
+
+const updateDraftContent = ({ draftId, content }) => {
+  const draft = drafts.value.find((item) => item.id === draftId);
+  if (draft) draft.content = content;
+};
+
+const saveDraftContent = async (draft) => {
+  const res = await saveWorkspaceDraftContent(draft.id, {
+    content: draft.content,
+    note: "工作台手动保存",
+  });
+  if (res.code === 200) {
+    Object.assign(draft, res.data.draft);
+    $message.success("草稿内容已保存");
+  }
+};
+
+const updateReview = async ({ draft, reviewStatus }) => {
+  const res = await updateWorkspaceDraftReview(draft.id, { reviewStatus });
+  if (res.code === 200) {
+    Object.assign(draft, res.data);
+    $message.success(`审核状态已更新为${reviewLabel(reviewStatus)}`);
   }
 };
 
@@ -1190,49 +589,32 @@ const checkDraft = async (draft) => {
       [draft.id]: res.data,
     };
     $message[res.data.passed ? "success" : "warning"](
-      res.data.passed ? "发布检查通过" : "发布前仍有风险项"
+      res.data.passed ? "发布检查通过" : "发布前仍有待处理项"
     );
-    await loadAuditLogs();
   }
 };
 
-const saveDraftContent = async (draft) => {
-  const res = await saveWorkspaceDraftContent(draft.id, {
-    content: draft.content,
-    note: "手动保存草稿",
-  });
-  if (res.code === 200) {
-    Object.assign(draft, res.data.draft);
-    draftVersions.value = {
-      ...draftVersions.value,
-      [draft.id]: [res.data.version, ...(draftVersions.value[draft.id] || [])],
-    };
-    $message.success("草稿版本已保存");
-    await loadAuditLogs();
+const loadPublishPackage = async (draft) => {
+  try {
+    const res = await getWorkspacePublishPackage(draft.id);
+    if (res.code === 200) {
+      publishPackages.value = {
+        ...publishPackages.value,
+        [draft.id]: res.data,
+      };
+      $message.success("发布包已生成");
+    }
+  } catch (error) {
+    // Interceptor already surfaces the server reason.
   }
 };
 
-const loadDraftVersions = async (draft) => {
-  const res = await getWorkspaceDraftVersions(draft.id);
-  if (res.code === 200) {
-    draftVersions.value = {
-      ...draftVersions.value,
-      [draft.id]: res.data,
-    };
-    $message.success("版本历史已加载");
-  }
-};
-
-const restoreDraftVersion = async (draft, version) => {
-  const res = await restoreWorkspaceDraftVersion(draft.id, version.id);
-  if (res.code === 200) {
-    Object.assign(draft, res.data.draft);
-    draftVersions.value = {
-      ...draftVersions.value,
-      [draft.id]: [res.data.version, ...(draftVersions.value[draft.id] || [])],
-    };
-    $message.success("已恢复历史版本");
-    await loadAuditLogs();
+const copyDraft = async (content) => {
+  try {
+    await navigator.clipboard.writeText(content);
+    $message.success("已复制到剪贴板");
+  } catch (error) {
+    $message.error("当前浏览器不支持剪贴板复制");
   }
 };
 
@@ -1240,260 +622,35 @@ const archiveDraft = async (draft) => {
   const res = await archiveWorkspaceDraft(draft.id);
   if (res.code === 200) {
     drafts.value = drafts.value.filter((item) => item.id !== draft.id);
+    delete checkResults.value[draft.id];
+    delete publishPackages.value[draft.id];
+    if (activeDraftId.value === draft.id) {
+      activeDraftId.value = drafts.value[0]?.id || "";
+    }
     $message.success("草稿已归档");
-    await Promise.all([loadOverview(), loadInsights(), loadAuditLogs()]);
+    await loadOverview();
   }
 };
 
-const loadPublishPackage = async (draft) => {
-  const res = await getWorkspacePublishPackage(draft.id);
-  if (res.code === 200) {
-    publishPackages.value = {
-      ...publishPackages.value,
-      [draft.id]: res.data,
-    };
-    $message.success("发布包已生成");
-    await loadAuditLogs();
+const openPublishTarget = (payload) => {
+  const target = payload?.deeplinks?.[0];
+  if (!target?.url) {
+    $message.warning("当前平台没有可用的跳转入口");
+    return;
   }
-};
-
-const sharePackage = async (publishPackage) => {
-  if (navigator.share) {
-    await navigator.share({
-      title: publishPackage.title,
-      text: publishPackage.mobileShareText || publishPackage.copyText,
-    });
-  } else {
-    await copyDraft(publishPackage.copyText);
-    $message.info("当前浏览器不支持系统分享，已复制发布包");
-  }
-};
-
-const downloadPackage = (publishPackage) => {
-  const file = publishPackage.files?.[0];
-  if (!file) return $message.warning("没有可下载文件");
-  const blob = new Blob([file.content], { type: file.mimeType || "text/plain;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = file.filename || `${publishPackage.draftId}.txt`;
-  link.click();
-  URL.revokeObjectURL(url);
-};
-
-const openPublishTarget = (publishPackage) => {
-  const target = publishPackage.deeplinks?.[0];
-  if (!target?.url) return $message.warning("该平台暂未配置跳转入口");
   const url = window.innerWidth <= 680 && target.mobileUrl ? target.mobileUrl : target.url;
   window.open(url, "_blank");
 };
 
-const recordPublish = async (draft) => {
-  const account = selectedAccountForDraft(draft);
-  const res = await createWorkspacePublishRecord({
-    draftId: draft.id,
-    platform: draft.platform,
-    accountId: account?.id,
-    status: "assisted",
-    note: "已复制或分享到目标平台，等待用户手动确认发布。",
-  });
-  if (res.code === 200) {
-    appendPublishRecord(res.data);
-    $message.success("发布动作已记录");
-    await Promise.all([loadOverview(), loadAuditLogs()]);
-  }
-};
-
-const appendPublishRecord = (record) => {
-  if (!record || publishRecords.value.some((item) => item.id === record.id)) return;
-  publishRecords.value = [record, ...publishRecords.value];
-  metricForms.value = {
-    ...metricForms.value,
-    [record.id]: {
-      views: record.metrics?.views || 0,
-      likes: record.metrics?.likes || 0,
-      comments: record.metrics?.comments || 0,
-      shares: record.metrics?.shares || 0,
-      leads: record.metrics?.leads || 0,
-    },
-  };
-};
-
-const schedulePublish = async (draft) => {
-  const account = selectedAccountForDraft(draft);
-  const scheduledAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
-  const res = await createWorkspacePublishSchedule({
-    draftId: draft.id,
-    platform: draft.platform,
-    accountId: account?.id,
-    scheduledAt,
-    note: "已加入发布计划，建议到点前再次检查内容和来源。",
-  });
-  if (res.code === 200) {
-    publishSchedules.value = [...publishSchedules.value, res.data].sort((a, b) =>
-      a.scheduledAt.localeCompare(b.scheduledAt)
-    );
-    $message.success("已加入发布计划");
-    await Promise.all([loadOverview(), loadAuditLogs()]);
-  }
-};
-
-const updateScheduleStatus = async (schedule, status) => {
-  const res = await updateWorkspacePublishSchedule(schedule.id, { status });
-  if (res.code === 200) {
-    const nextSchedule = res.data.schedule || res.data;
-    Object.assign(schedule, nextSchedule);
-    appendPublishRecord(res.data.publishRecord);
-    $message.success(`计划已更新：${scheduleLabel(status)}`);
-    await Promise.all([loadOverview(), loadAuditLogs()]);
-  }
-};
-
-const updateReview = async (draft, reviewStatus) => {
-  const res = await updateWorkspaceDraftReview(draft.id, { reviewStatus });
-  if (res.code === 200) {
-    Object.assign(draft, res.data);
-    $message.success(`已更新为：${reviewLabel(reviewStatus)}`);
-    await Promise.all([loadOverview(), loadAuditLogs()]);
-  }
-};
-
-const saveMetrics = async (record) => {
-  const res = await updateWorkspacePublishMetrics(record.id, {
-    ...metricForms.value[record.id],
-    status: "published",
-  });
-  if (res.code === 200) {
-    Object.assign(record, res.data);
-    $message.success("发布指标已保存");
-    await Promise.all([loadOverview(), loadAuditLogs()]);
-  }
-};
-
-const riskLabel = (risk) => {
-  return {
-    low: "低风险",
-    medium: "需核实",
-    high: "高风险",
-  }[risk];
-};
-
-const riskType = (risk) => {
-  return {
-    low: "success",
-    medium: "warning",
-    high: "error",
-  }[risk];
-};
-
-const isPublishBlocked = (draft) => {
-  return draft.topic?.riskLevel === "high" && draft.reviewStatus !== "approved";
-};
-
-const platformLabel = (platform) => {
-  return {
-    weibo: "微博短评",
-    xiaohongshu: "小红书笔记",
-    article: "公众号开头",
-    moments: "朋友圈动态",
-    video: "视频口播",
-  }[platform] || platform;
-};
-
-const defaultAccountForPlatform = (platform) => {
-  return platformAccounts.value.find((account) => account.platform === platform && account.status !== "inactive");
-};
-
-const accountOptionsForDraft = (draft) => {
-  const accounts = platformAccounts.value.filter(
-    (account) => account.platform === draft.platform && account.status !== "inactive"
+const reviewLabel = (status) =>
+  (
+    {
+      draft: "草稿",
+      reviewing: "审核中",
+      approved: "已通过",
+      rejected: "已驳回",
+    }[status] || "草稿"
   );
-  return [
-    { label: "不指定账号", value: "" },
-    ...accounts.map((account) => ({
-      label: account.displayName,
-      value: account.id,
-    })),
-  ];
-};
-
-const selectedAccountIdForDraft = (draft) => {
-  const selectedId = selectedAccountIds.value[draft.id];
-  const activeAccount = platformAccounts.value.find(
-    (account) => account.id === selectedId && account.platform === draft.platform && account.status !== "inactive"
-  );
-  return activeAccount?.id || defaultAccountForPlatform(draft.platform)?.id || "";
-};
-
-const selectedAccountForDraft = (draft) => {
-  const accountId = selectedAccountIdForDraft(draft);
-  return platformAccounts.value.find((account) => account.id === accountId);
-};
-
-const setSelectedAccount = (draft, accountId) => {
-  selectedAccountIds.value = {
-    ...selectedAccountIds.value,
-    [draft.id]: accountId || "",
-  };
-};
-
-const reviewLabel = (status = "draft") => {
-  return {
-    draft: "草稿",
-    reviewing: "审核中",
-    approved: "已通过",
-    rejected: "已驳回",
-  }[status] || "草稿";
-};
-
-const reviewType = (status = "draft") => {
-  return {
-    draft: "default",
-    reviewing: "warning",
-    approved: "success",
-    rejected: "error",
-  }[status] || "default";
-};
-
-const generationLabel = (mode = "template") => {
-  return {
-    ai: "AI 生成",
-    template: "模板生成",
-  }[mode] || "模板生成";
-};
-
-const generationType = (mode = "template") => {
-  return {
-    ai: "success",
-    template: "default",
-  }[mode] || "default";
-};
-
-const scheduleLabel = (status = "pending") => {
-  return {
-    pending: "待排期",
-    ready: "待发布",
-    published: "已发布",
-    skipped: "已跳过",
-    failed: "失败",
-  }[status] || "待排期";
-};
-
-const scheduleType = (status = "pending") => {
-  return {
-    pending: "info",
-    ready: "warning",
-    published: "success",
-    skipped: "default",
-    failed: "error",
-  }[status] || "info";
-};
-
-const isScheduleOverdue = (schedule) => {
-  return ["pending", "ready"].includes(schedule.status) && new Date(schedule.scheduledAt).getTime() <= Date.now();
-};
-
-const formatDate = (date) => new Date(date).toLocaleString();
 
 onMounted(async () => {
   await reloadWorkspace();
@@ -1501,325 +658,85 @@ onMounted(async () => {
 </script>
 
 <style lang="scss" scoped>
-.workspace {
-  .hero {
+.workspace-page {
+  display: grid;
+  gap: 20px;
+  padding-bottom: 28px;
+
+  .workspace-hero {
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
-    gap: 20px;
-    margin-bottom: 20px;
+    gap: 18px;
     padding: 28px;
-    border-radius: 20px;
+    border: 1px solid rgba(234, 68, 77, 0.14);
+    border-radius: 24px;
     background:
-      radial-gradient(circle at 12% 20%, rgba(234, 68, 77, 0.18), transparent 26%),
-      linear-gradient(135deg, rgba(45, 112, 237, 0.12), rgba(238, 173, 63, 0.12));
+      radial-gradient(circle at top left, rgba(234, 68, 77, 0.18), transparent 30%),
+      linear-gradient(135deg, rgba(255, 244, 230, 0.96), rgba(247, 251, 255, 0.98));
 
     h1 {
-      margin: 14px 0 10px;
-      font-size: clamp(30px, 5vw, 56px);
-      line-height: 1;
+      margin: 12px 0 8px;
+      font-size: clamp(34px, 5vw, 58px);
+      line-height: 0.96;
       letter-spacing: -0.08em;
     }
 
     p {
-      max-width: 780px;
+      max-width: 760px;
       margin: 0;
-      font-size: 16px;
+      color: var(--n-text-color-2);
+      font-size: 15px;
       line-height: 1.8;
     }
   }
 
-  .panel {
-    height: 100%;
-    border-radius: 16px;
+  .hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 10px;
   }
 
-  .overview-grid {
-    margin-bottom: 20px;
+  .metric-card,
+  .setup-panel {
+    border-radius: 18px;
   }
 
-  .metric-card {
-    border-radius: 16px;
+  .metric-grid {
+    margin-top: -2px;
   }
 
-  .persona-panel,
-  .account-panel,
-  .insights-panel,
-  .accounts-panel,
-  .schedules-panel,
-  .records-panel,
-  .audit-panel {
-    margin-top: 20px;
-  }
+  .setup-form {
+    .identity-actions {
+      margin-top: 10px;
+    }
 
-  .account-panel {
-    margin-bottom: 20px;
-
-    .account-tip {
+    .preset-action {
       margin-top: 12px;
     }
   }
 
-  .accounts-panel {
-    .account-list {
-      display: grid;
-      gap: 10px;
-      margin-top: 14px;
-
-      .account-item {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 12px;
-        padding: 12px;
-        border: 1px solid rgba(148, 163, 184, 0.24);
-        border-radius: 12px;
-        background: rgba(248, 250, 252, 0.7);
-
-        p {
-          margin: 6px 0 0;
-          color: var(--n-text-color-2);
-          word-break: break-all;
-        }
-
-        &.inactive {
-          opacity: 0.62;
-        }
-      }
-    }
-  }
-
-  .insights-panel {
-    .insight-list {
-      margin: 14px 0 0;
-      padding-left: 18px;
-      color: var(--n-text-color-2);
-      line-height: 1.8;
-    }
-  }
-
-  .card-header {
+  .panel-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
   }
 
-  .topic-list,
-  .draft-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+  .draft-section {
+    margin-top: 6px;
   }
 
-  .draft-filters {
-    margin-bottom: 12px;
-  }
-
-  .topic {
-    display: flex;
-    justify-content: space-between;
-    gap: 14px;
-    padding: 16px;
-    border: 1px solid var(--n-border-color);
-    border-radius: 14px;
-    cursor: pointer;
-    transition: 0.2s ease;
-
-    &:hover,
-    &.active {
-      border-color: #ea444d;
-      transform: translateY(-1px);
-    }
-
-    .topic-main {
-      min-width: 0;
-    }
-
-    .topic-title {
-      font-size: 17px;
-      font-weight: 700;
-      line-height: 1.5;
-    }
-
-    .topic-meta,
-    .matches {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 8px;
-      margin-top: 8px;
-    }
-
-    .topic-desc {
-      margin: 10px 0 0;
-      color: var(--n-text-color-3);
-      line-height: 1.7;
-    }
-  }
-
-  .bottom-grid {
-    margin-top: 20px;
-  }
-
-  .generate-form {
-    margin-top: 18px;
-  }
-
-  .topic-detail {
-    margin-top: 12px;
-    padding: 14px;
-    border: 1px solid var(--n-border-color);
-    border-radius: 14px;
-
-    p {
-      margin: 10px 0;
-      color: var(--n-text-color-2);
-      line-height: 1.7;
-    }
-
-    .source-links {
-      margin-top: 8px;
-    }
-  }
-
-  .draft {
-    padding: 16px;
-    border: 1px solid var(--n-border-color);
-    border-radius: 14px;
-
-    h3 {
-      margin: 10px 0;
-      font-size: 16px;
-    }
-
-    .draft-meta,
-    .draft-actions,
-    .review-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .review-row {
-      justify-content: space-between;
-      margin: 10px 0;
-      flex-wrap: wrap;
-    }
-
-    .draft-actions {
-      margin-top: 12px;
-    }
-
-    .draft-account-select {
-      margin-top: 10px;
-    }
-
-    .check-result {
-      margin-top: 12px;
-
-      .check-title {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        margin-bottom: 6px;
-        font-weight: 700;
-      }
-
-      ul {
-        margin: 0;
-        padding-left: 18px;
-      }
-    }
-
-    .publish-package {
-      margin-top: 12px;
-
-      .tag-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
-
-      .package-checklist {
-        margin: 0;
-        padding-left: 18px;
-        color: var(--n-text-color-2);
-        line-height: 1.7;
-      }
-
-      .media-suggestion {
-        display: grid;
-        gap: 10px;
-        padding: 12px;
-        border: 1px solid rgba(148, 163, 184, 0.28);
-        border-radius: 12px;
-        background: rgba(248, 250, 252, 0.72);
-
-        p {
-          margin: 0;
-          color: var(--n-text-color-2);
-        }
-
-        .media-title {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-        }
-      }
-    }
-
-    .draft-versions {
-      margin-top: 12px;
-
-      .version-preview {
-        display: -webkit-box;
-        margin: 0 0 8px;
-        overflow: hidden;
-        color: var(--n-text-color-2);
-        line-height: 1.7;
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 3;
-      }
-    }
-  }
-
-  .schedules-panel {
-    .schedule-filters {
-      margin-bottom: 12px;
-    }
-  }
-
-  .schedule-content,
-  .record-content {
-    p {
-      margin: 0 0 10px;
-    }
-
-    .record-actions {
-      margin-top: 10px;
-    }
-  }
-
-  @media (max-width: 760px) {
-    .hero {
+  @media (max-width: 900px) {
+    .workspace-hero {
+      flex-direction: column;
       align-items: stretch;
-      flex-direction: column;
-      padding: 20px;
+      padding: 22px;
     }
 
-    .topic {
-      flex-direction: column;
-    }
-
-    .draft {
-      .draft-meta,
-      .draft-actions {
-        flex-wrap: wrap;
-        justify-content: flex-start;
-      }
+    .hero-actions {
+      justify-content: flex-start;
     }
   }
 }
